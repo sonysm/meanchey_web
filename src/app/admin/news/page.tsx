@@ -1,4 +1,4 @@
-import { mockNews, statusColors } from "@/lib/news";
+import { getNews, statusColors } from "@/lib/news";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +12,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Pencil, Eye, Trash2 } from "lucide-react";
 
-export default function NewsListPage() {
+export default async function NewsListPage() {
+  const articles = await getNews(50, 0);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -29,7 +31,7 @@ export default function NewsListPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">All Articles ({mockNews.length})</CardTitle>
+          <CardTitle className="text-base">All Articles ({articles.length})</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -44,7 +46,7 @@ export default function NewsListPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockNews.map((news) => (
+              {articles.map((news) => (
                 <TableRow key={news.id}>
                   <TableCell>
                     <div>

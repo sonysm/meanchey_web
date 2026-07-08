@@ -13,9 +13,10 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import type { AuthSession } from "@/lib/auth";
 
 const navItems = [
   {
@@ -36,9 +37,16 @@ const navItems = [
   },
 ];
 
-export function AdminSidebar() {
+export function AdminSidebar({
+  user,
+}: {
+  user?: AuthSession | null;
+}) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const visibleNavItems = user?.isEmployer
+    ? navItems
+    : navItems.filter((item) => item.href !== "/admin/news/create");
 
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname.startsWith(href);
@@ -69,7 +77,7 @@ export function AdminSidebar() {
 
       {/* Nav */}
       <nav className="flex-1 py-4 space-y-1 px-2">
-        {navItems.map((item) => (
+        {visibleNavItems.map((item) => (
           <Link key={item.href} href={item.href}>
             <span
               className={cn(
@@ -102,21 +110,47 @@ export function AdminSidebar() {
         </Link>
 
         {!collapsed && (
-          <div className="flex items-center gap-3 px-3 py-2">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                AD
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">Admin</p>
-              <p className="text-xs text-muted-foreground truncate">
-                admin@meanchey.com
-              </p>
+          <div className="space-y-3 px-3 py-2">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                  {(user?.displayName?.[0] ?? "A").toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">
+                  {user?.displayName ?? "Guest"}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {user?.email ?? "Sign in to manage articles"}
+                </p>
+              </div>
             </div>
-            <Button variant="ghost" size="icon" className="shrink-0">
-              <LogOut size={16} />
-            </Button>
+
+            <div className="flex items-center gap-2">
+              {user ? (
+                <Link
+                  href="/api/auth/logout"
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "w-full justify-center gap-2",
+                  )}
+                >
+                  <LogOut size={16} />
+                  Log out
+                </Link>
+              ) : (
+                <Link
+                  href="/login"
+                  className={cn(
+                    buttonVariants({ variant: "default", size: "sm" }),
+                    "w-full justify-center",
+                  )}
+                >
+                  Sign in
+                </Link>
+              )}
+            </div>
           </div>
         )}
       </div>

@@ -1,4 +1,4 @@
-import { mockNews, statusColors } from "@/lib/news";
+import { getNewsById, statusColors } from "@/lib/news";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ export default async function NewsDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const news = mockNews.find((n) => n.id === id);
+  const news = await getNewsById(id);
   if (!news) notFound();
 
   return (

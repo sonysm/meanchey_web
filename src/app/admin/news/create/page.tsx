@@ -1,14 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useEffect, useMemo, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import QuillEditor from "@/components/admin/QuillEditor";
+import TagInput from "@/components/admin/tag-input";
 import {
   Select,
   SelectContent,
@@ -18,46 +20,109 @@ import {
 } from "@/components/ui/select";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
+import type { AuthCompany, AuthSession } from "@/lib/auth";
 
 const newsSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
-  titleKh: z.string().optional(),
-  excerpt: z.string().optional(),
-  content: z.string().min(10, "Content is required"),
-  category: z.string().min(1, "Category is required"),
+  content: z.string().min(2, "Content is required"),
   status: z.enum(["published", "draft", "archived"]),
-  tags: z.string().optional(),
+  tags: z.array(z.string()),
   coverImage: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  companyId: z.string().min(1, "Host company is required"),
 });
 
 type NewsFormValues = z.infer<typeof newsSchema>;
 
-const categories = [
-  { id: "1", name: "Economy" },
-  { id: "2", name: "Politics" },
-  { id: "3", name: "Tourism" },
-  { id: "4", name: "Technology" },
-  { id: "5", name: "Sports" },
-  { id: "6", name: "Culture" },
-];
-
 export default function CreateNewsPage() {
   const router = useRouter();
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [session, setSession] = useState<AuthSession | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const [imageUploadState, setImageUploadState] = useState({ uploading: 0, failed: 0 });
 
   const {
     register,
     handleSubmit,
+    control,
+    getValues,
     setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<NewsFormValues>({
     resolver: zodResolver(newsSchema),
-    defaultValues: { status: "draft" },
+    defaultValues: {
+      status: "draft",
+      content: JSON.stringify({ ops: [{ insert: "\n" }] }),
+      tags: [],
+      companyId: "",
+    },
   });
 
+  const companyIdValue = watch("companyId");
+
+  const companies = useMemo<AuthCompany[]>(() => session?.companies ?? [], [session]);
+
+  useEffect(() => {
+    const loadSession = async () => {
+      setIsLoadingSession(true);
+      setLoadError(null);
+
+      try {
+        const response = await fetch("/api/auth/session");
+        const payload = (await response.json().catch(() => ({}))) as { data?: AuthSession | null };
+
+        if (!response.ok) {
+          throw new Error("Failed to load login session");
+        }
+
+        const nextSession = payload.data ?? null;
+        setSession(nextSession);
+
+        const selectedCompanyId = getValues("companyId");
+        const firstCompanyId = nextSession?.companies?.[0]?.id.toString() ?? "";
+
+        if (!selectedCompanyId && firstCompanyId) {
+          setValue("companyId", firstCompanyId, { shouldValidate: true });
+        }
+      } catch (error) {
+        setLoadError(error instanceof Error ? error.message : "Failed to load login session");
+      } finally {
+        setIsLoadingSession(false);
+      }
+    };
+
+    void loadSession();
+  }, [getValues, setValue]);
+
+  useEffect(() => {
+    if (!companyIdValue && companies.length === 1) {
+      setValue("companyId", companies[0]?.id.toString() ?? "", { shouldValidate: true });
+    }
+  }, [companies, companyIdValue, setValue]);
+
   const onSubmit = async (data: NewsFormValues) => {
-    // TODO: Connect to your API
-    console.log("Creating news:", data);
-    await new Promise((r) => setTimeout(r, 500));
+    if (imageUploadState.uploading > 0 || imageUploadState.failed > 0) {
+      setSubmitError("Please wait until all images are uploaded successfully.");
+      return;
+    }
+
+    setSubmitError(null);
+
+    const response = await fetch("/api/admin/articles", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const payload = (await response.json()) as { message?: string };
+      setSubmitError(payload.message ?? "Failed to create article");
+      return;
+    }
+
     router.push("/admin/news");
   };
 
@@ -77,6 +142,9 @@ export default function CreateNewsPage() {
         </div>
       </div>
 
+      {loadError && <p className="text-sm text-destructive">{loadError}</p>}
+      {submitError && <p className="text-sm text-destructive">{submitError}</p>}
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <Card>
           <CardHeader>
@@ -92,34 +160,33 @@ export default function CreateNewsPage() {
               )}
             </div>
 
-            {/* Title KH */}
-            <div className="space-y-1.5">
-              <Label htmlFor="titleKh">Title (Khmer)</Label>
-              <Input id="titleKh" placeholder="ចំណងជើងជាភាសាខ្មែរ" {...register("titleKh")} />
-            </div>
-
-            {/* Excerpt */}
-            <div className="space-y-1.5">
-              <Label htmlFor="excerpt">Excerpt</Label>
-              <Textarea
-                id="excerpt"
-                placeholder="Short summary of the article..."
-                rows={2}
-                {...register("excerpt")}
-              />
-            </div>
-
             {/* Content */}
             <div className="space-y-1.5">
               <Label htmlFor="content">Content *</Label>
-              <Textarea
-                id="content"
-                placeholder="Write your article content here..."
-                rows={10}
-                {...register("content")}
+              <Controller
+                control={control}
+                name="content"
+                render={({ field }) => (
+                  <QuillEditor
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder="Write your article content here..."
+                    onImageUploadStateChange={setImageUploadState}
+                  />
+                )}
               />
               {errors.content && (
                 <p className="text-xs text-destructive">{errors.content.message}</p>
+              )}
+              {imageUploadState.uploading > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Uploading {imageUploadState.uploading} image(s). Save is disabled until finished.
+                </p>
+              )}
+              {imageUploadState.failed > 0 && (
+                <p className="text-xs text-destructive">
+                  {imageUploadState.failed} image upload failed. Remove the failed image or insert it again to re-upload.
+                </p>
               )}
             </div>
           </CardContent>
@@ -131,23 +198,32 @@ export default function CreateNewsPage() {
             <CardTitle className="text-base">Settings</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Category */}
+            {/* Host company */}
             <div className="space-y-1.5">
-              <Label>Category *</Label>
-              <Select onValueChange={(v) => setValue("category", v as string)}>
+              <Label>Host Company *</Label>
+              <Select
+                value={companyIdValue}
+                onValueChange={(v) => setValue("companyId", v ?? "", { shouldValidate: true })}
+                disabled={isLoadingSession || companies.length === 0}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
+                  <SelectValue placeholder={isLoadingSession ? "Loading companies..." : "Select host company"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id.toString()}>
+                      {company.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {errors.category && (
-                <p className="text-xs text-destructive">{errors.category.message}</p>
+              {errors.companyId && (
+                <p className="text-xs text-destructive">{errors.companyId.message}</p>
+              )}
+              {!isLoadingSession && companies.length === 0 && !loadError && (
+                <p className="text-xs text-muted-foreground">
+                  No company is linked to this account.
+                </p>
               )}
             </div>
 
@@ -173,11 +249,17 @@ export default function CreateNewsPage() {
 
             {/* Tags */}
             <div className="space-y-1.5">
-              <Label htmlFor="tags">Tags</Label>
-              <Input
-                id="tags"
-                placeholder="economy, cambodia, news (comma separated)"
-                {...register("tags")}
+              <Label>Tags</Label>
+              <Controller
+                control={control}
+                name="tags"
+                render={({ field }) => (
+                  <TagInput
+                    value={field.value ?? []}
+                    onChange={field.onChange}
+                    placeholder="Type a tag and press Enter"
+                  />
+                )}
               />
             </div>
 
@@ -197,7 +279,17 @@ export default function CreateNewsPage() {
         </Card>
 
         <div className="flex gap-3">
-          <Button type="submit" disabled={isSubmitting} className="gap-2">
+          <Button
+            type="submit"
+            disabled={
+              isSubmitting ||
+              isLoadingSession ||
+              companies.length === 0 ||
+              imageUploadState.uploading > 0 ||
+              imageUploadState.failed > 0
+            }
+            className="gap-2"
+          >
             <Save size={16} />
             {isSubmitting ? "Saving..." : "Save Article"}
           </Button>

@@ -1,17 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { use } from "react";
-import { useForm } from "react-hook-form";
+import { use, useEffect, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { mockNews } from "@/lib/news";
-import { notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import QuillEditor from "@/components/admin/QuillEditor";
+import TagInput from "@/components/admin/tag-input";
 import {
   Select,
   SelectContent,
@@ -24,25 +23,13 @@ import Link from "next/link";
 
 const newsSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
-  titleKh: z.string().optional(),
-  excerpt: z.string().optional(),
-  content: z.string().min(10, "Content is required"),
-  category: z.string().min(1, "Category is required"),
+  content: z.string().min(2, "Content is required"),
   status: z.enum(["published", "draft", "archived"]),
-  tags: z.string().optional(),
+  tags: z.array(z.string()),
   coverImage: z.string().url("Must be a valid URL").optional().or(z.literal("")),
 });
 
 type NewsFormValues = z.infer<typeof newsSchema>;
-
-const categories = [
-  { id: "1", name: "Economy" },
-  { id: "2", name: "Politics" },
-  { id: "3", name: "Tourism" },
-  { id: "4", name: "Technology" },
-  { id: "5", name: "Sports" },
-  { id: "6", name: "Culture" },
-];
 
 export default function EditNewsPage({
   params,
@@ -51,33 +38,113 @@ export default function EditNewsPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
-  const news = mockNews.find((n) => n.id === id);
-
-  if (!news) notFound();
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isLoadingArticle, setIsLoadingArticle] = useState(true);
+  const [imageBaseUrl, setImageBaseUrl] = useState<string>(
+    `https://jobs.kramapost.com/storage/job/${id}`,
+  );
+  const [imageUploadState, setImageUploadState] = useState({ uploading: 0, failed: 0 });
 
   const {
     register,
     handleSubmit,
+    control,
     setValue,
+    reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<NewsFormValues>({
     resolver: zodResolver(newsSchema),
     defaultValues: {
-      title: news.title,
-      titleKh: news.titleKh ?? "",
-      excerpt: news.excerpt ?? "",
-      content: news.content,
-      category: news.category?.id ?? "",
-      status: news.status,
-      tags: news.tags?.join(", ") ?? "",
-      coverImage: news.coverImage ?? "",
+      title: "",
+      content: JSON.stringify({ ops: [{ insert: "\n" }] }),
+      status: "draft",
+      tags: [],
+      coverImage: "",
     },
   });
 
+  const statusValue = watch("status");
+
+  useEffect(() => {
+    const loadArticle = async () => {
+      setIsLoadingArticle(true);
+      setLoadError(null);
+
+      try {
+        const response = await fetch(`/api/admin/articles/${id}`);
+        if (!response.ok) {
+          throw new Error("Failed to load article");
+        }
+
+        const payload = (await response.json()) as {
+          data?: {
+            title?: string;
+            content?: string;
+            photoPath?: string;
+            status?: "published" | "draft" | "archived";
+            tags?: string[];
+            tag?: string | string[];
+            coverImage?: string;
+          };
+        };
+
+        const article = payload.data;
+        if (!article) {
+          throw new Error("Article not found");
+        }
+
+        setImageBaseUrl(article.photoPath ?? `https://jobs.kramapost.com/storage/job/${id}`);
+
+        reset({
+          title: article.title ?? "",
+          content:
+            article.content && article.content.trim().length > 0
+              ? article.content
+              : JSON.stringify({ ops: [{ insert: "\n" }] }),
+          status: article.status ?? "draft",
+          tags: Array.isArray(article.tags)
+            ? article.tags
+            : Array.isArray(article.tag)
+              ? article.tag
+              : typeof article.tag === "string"
+                ? article.tag.split(",").map((tag) => tag.trim()).filter(Boolean)
+                : [],
+          coverImage: article.coverImage ?? "",
+        });
+      } catch (error) {
+        setLoadError(error instanceof Error ? error.message : "Failed to load article");
+      } finally {
+        setIsLoadingArticle(false);
+      }
+    };
+
+    void loadArticle();
+  }, [id, reset]);
+
   const onSubmit = async (data: NewsFormValues) => {
-    // TODO: Connect to your API
-    console.log("Updating news:", id, data);
-    await new Promise((r) => setTimeout(r, 500));
+    if (imageUploadState.uploading > 0 || imageUploadState.failed > 0) {
+      setSubmitError("Please wait until all images are uploaded successfully.");
+      return;
+    }
+
+    setSubmitError(null);
+
+    const response = await fetch(`/api/admin/articles/${id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const payload = (await response.json()) as { message?: string };
+      setSubmitError(payload.message ?? "Failed to update article");
+      return;
+    }
+
     router.push("/admin/news");
   };
 
@@ -95,6 +162,9 @@ export default function EditNewsPage({
         </div>
       </div>
 
+      {loadError && <p className="text-sm text-destructive">{loadError}</p>}
+      {submitError && <p className="text-sm text-destructive">{submitError}</p>}
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <Card>
           <CardHeader>
@@ -110,20 +180,32 @@ export default function EditNewsPage({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="titleKh">Title (Khmer)</Label>
-              <Input id="titleKh" {...register("titleKh")} />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="excerpt">Excerpt</Label>
-              <Textarea id="excerpt" rows={2} {...register("excerpt")} />
-            </div>
-
-            <div className="space-y-1.5">
               <Label htmlFor="content">Content *</Label>
-              <Textarea id="content" rows={10} {...register("content")} />
+              <Controller
+                control={control}
+                name="content"
+                render={({ field }) => (
+                  <QuillEditor
+                    value={field.value}
+                    onChange={field.onChange}
+                    placeholder="Write your article content here..."
+                    imageBaseUrl={imageBaseUrl}
+                    onImageUploadStateChange={setImageUploadState}
+                  />
+                )}
+              />
               {errors.content && (
                 <p className="text-xs text-destructive">{errors.content.message}</p>
+              )}
+              {imageUploadState.uploading > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Uploading {imageUploadState.uploading} image(s). Save is disabled until finished.
+                </p>
+              )}
+              {imageUploadState.failed > 0 && (
+                <p className="text-xs text-destructive">
+                  {imageUploadState.failed} image upload failed. Remove the failed image or insert it again to re-upload.
+                </p>
               )}
             </div>
           </CardContent>
@@ -135,28 +217,9 @@ export default function EditNewsPage({
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Category *</Label>
-              <Select
-                defaultValue={news.category?.id ?? ""}
-                onValueChange={(v) => setValue("category", v ?? "")}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
               <Label>Status</Label>
               <Select
-                defaultValue={news.status}
+                value={statusValue}
                 onValueChange={(v) =>
                   setValue("status", v as "published" | "draft" | "archived")
                 }
@@ -173,8 +236,18 @@ export default function EditNewsPage({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="tags">Tags</Label>
-              <Input id="tags" {...register("tags")} />
+              <Label>Tags</Label>
+              <Controller
+                control={control}
+                name="tags"
+                render={({ field }) => (
+                  <TagInput
+                    value={field.value ?? []}
+                    onChange={field.onChange}
+                    placeholder="Type a tag and press Enter"
+                  />
+                )}
+              />
             </div>
 
             <div className="space-y-1.5">
@@ -188,9 +261,18 @@ export default function EditNewsPage({
         </Card>
 
         <div className="flex gap-3">
-          <Button type="submit" disabled={isSubmitting} className="gap-2">
+          <Button
+            type="submit"
+            disabled={
+              isSubmitting ||
+              isLoadingArticle ||
+              imageUploadState.uploading > 0 ||
+              imageUploadState.failed > 0
+            }
+            className="gap-2"
+          >
             <Save size={16} />
-            {isSubmitting ? "Saving..." : "Update Article"}
+            {isLoadingArticle ? "Loading..." : isSubmitting ? "Saving..." : "Update Article"}
           </Button>
           <Link href="/admin/news">
             <Button type="button" variant="outline">

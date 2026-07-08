@@ -14,6 +14,7 @@ export interface News {
   excerpt?: string;
   content: string;
   coverImage?: string;
+  photoPath?: string;
   category?: NewsCategory;
   tags?: string[];
   status: NewsStatus;
