@@ -11,22 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import QuillEditor from "@/components/admin/QuillEditor";
 import TagInput from "@/components/admin/tag-input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
 
 const newsSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
   content: z.string().min(2, "Content is required"),
-  status: z.enum(["published", "draft", "archived"]),
   tags: z.array(z.string()),
-  coverImage: z.string().url("Must be a valid URL").optional().or(z.literal("")),
 });
 
 type NewsFormValues = z.infer<typeof newsSchema>;
@@ -50,22 +41,16 @@ export default function EditNewsPage({
     register,
     handleSubmit,
     control,
-    setValue,
     reset,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<NewsFormValues>({
     resolver: zodResolver(newsSchema),
     defaultValues: {
       title: "",
       content: JSON.stringify({ ops: [{ insert: "\n" }] }),
-      status: "draft",
       tags: [],
-      coverImage: "",
     },
   });
-
-  const statusValue = watch("status");
 
   useEffect(() => {
     const loadArticle = async () => {
@@ -83,10 +68,8 @@ export default function EditNewsPage({
             title?: string;
             content?: string;
             photoPath?: string;
-            status?: "published" | "draft" | "archived";
             tags?: string[];
             tag?: string | string[];
-            coverImage?: string;
           };
         };
 
@@ -103,7 +86,6 @@ export default function EditNewsPage({
             article.content && article.content.trim().length > 0
               ? article.content
               : JSON.stringify({ ops: [{ insert: "\n" }] }),
-          status: article.status ?? "draft",
           tags: Array.isArray(article.tags)
             ? article.tags
             : Array.isArray(article.tag)
@@ -111,7 +93,6 @@ export default function EditNewsPage({
               : typeof article.tag === "string"
                 ? article.tag.split(",").map((tag) => tag.trim()).filter(Boolean)
                 : [],
-          coverImage: article.coverImage ?? "",
         });
       } catch (error) {
         setLoadError(error instanceof Error ? error.message : "Failed to load article");
@@ -217,25 +198,6 @@ export default function EditNewsPage({
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Status</Label>
-              <Select
-                value={statusValue}
-                onValueChange={(v) =>
-                  setValue("status", v as "published" | "draft" | "archived")
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="published">Published</SelectItem>
-                  <SelectItem value="archived">Archived</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
               <Label>Tags</Label>
               <Controller
                 control={control}
@@ -250,13 +212,6 @@ export default function EditNewsPage({
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="coverImage">Cover Image URL</Label>
-              <Input id="coverImage" {...register("coverImage")} />
-              {errors.coverImage && (
-                <p className="text-xs text-destructive">{errors.coverImage.message}</p>
-              )}
-            </div>
           </CardContent>
         </Card>
 

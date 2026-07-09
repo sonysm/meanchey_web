@@ -49,15 +49,28 @@ export default async function NewsListPage() {
               {articles.map((news) => (
                 <TableRow key={news.id}>
                   <TableCell>
-                    <div>
-                      <p className="font-medium text-sm line-clamp-1">
-                        {news.title}
-                      </p>
-                      {news.titleKh && (
-                        <p className="text-xs text-muted-foreground line-clamp-1">
-                          {news.titleKh}
-                        </p>
+                    <div className="flex items-center gap-3">
+                      {news.coverImage ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={news.coverImage}
+                          alt={news.title}
+                          className="h-12 w-16 rounded object-cover border border-border"
+                        />
+                      ) : (
+                        <div className="h-12 w-16 rounded border border-dashed border-border bg-muted" />
                       )}
+
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm line-clamp-1">
+                          {news.title}
+                        </p>
+                        {news.titleKh && (
+                          <p className="text-xs text-muted-foreground line-clamp-1">
+                            {news.titleKh}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>

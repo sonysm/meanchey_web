@@ -25,9 +25,7 @@ import type { AuthCompany, AuthSession } from "@/lib/auth";
 const newsSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
   content: z.string().min(2, "Content is required"),
-  status: z.enum(["published", "draft", "archived"]),
   tags: z.array(z.string()),
-  coverImage: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   companyId: z.string().min(1, "Host company is required"),
 });
 
@@ -52,7 +50,6 @@ export default function CreateNewsPage() {
   } = useForm<NewsFormValues>({
     resolver: zodResolver(newsSchema),
     defaultValues: {
-      status: "draft",
       content: JSON.stringify({ ops: [{ insert: "\n" }] }),
       tags: [],
       companyId: "",
@@ -227,26 +224,6 @@ export default function CreateNewsPage() {
               )}
             </div>
 
-            {/* Status */}
-            <div className="space-y-1.5">
-              <Label>Status</Label>
-              <Select
-                defaultValue="draft"
-                onValueChange={(v) =>
-                  setValue("status", v as "published" | "draft" | "archived")
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="published">Published</SelectItem>
-                  <SelectItem value="archived">Archived</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Tags */}
             <div className="space-y-1.5">
               <Label>Tags</Label>
@@ -263,18 +240,6 @@ export default function CreateNewsPage() {
               />
             </div>
 
-            {/* Cover Image */}
-            <div className="space-y-1.5">
-              <Label htmlFor="coverImage">Cover Image URL</Label>
-              <Input
-                id="coverImage"
-                placeholder="https://example.com/image.jpg"
-                {...register("coverImage")}
-              />
-              {errors.coverImage && (
-                <p className="text-xs text-destructive">{errors.coverImage.message}</p>
-              )}
-            </div>
           </CardContent>
         </Card>
 

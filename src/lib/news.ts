@@ -32,6 +32,114 @@ const normalizeNewsStatus = (status: unknown): NewsStatus => {
   return "draft";
 };
 
+const buildDefaultPhotoBase = (id: string): string => {
+  return `https://jobs.kramapost.com/storage/job/${id}`;
+};
+
+const toAbsoluteImageUrl = (image: string, photoBase: string): string => {
+  const normalized = image.trim();
+  if (!normalized) {
+    return normalized;
+  }
+
+  if (
+    normalized.startsWith("http://") ||
+    normalized.startsWith("https://") ||
+    normalized.startsWith("data:")
+  ) {
+    return normalized;
+  }
+
+  return `${photoBase.replace(/\/$/, "")}/${normalized.replace(/^\//, "")}`;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === "object" && value !== null;
+};
+
+const extractFirstImageFromUnknown = (value: unknown): string | null => {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === "string") {
+    const text = value.trim();
+    if (!text) {
+      return null;
+    }
+
+    if (text.startsWith("http://") || text.startsWith("https://") || text.startsWith("/")) {
+      return text;
+    }
+
+    try {
+      const parsed = JSON.parse(text) as unknown;
+      return extractFirstImageFromUnknown(parsed);
+    } catch {
+      return null;
+    }
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = extractFirstImageFromUnknown(item);
+      if (found) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const insert = value.insert;
+  if (isRecord(insert) && typeof insert.image === "string" && insert.image.trim().length > 0) {
+    return insert.image.trim();
+  }
+
+  const imgs = value.imgs;
+  if (Array.isArray(imgs)) {
+    const first = imgs.find((img): img is string => typeof img === "string" && img.trim().length > 0);
+    if (first) {
+      return first.trim();
+    }
+  }
+
+  const candidates = [value.ops, value.detail, value.content, value.data, value.info, value.result];
+  for (const candidate of candidates) {
+    const found = extractFirstImageFromUnknown(candidate);
+    if (found) {
+      return found;
+    }
+  }
+
+  return null;
+};
+
+const resolveCoverImage = (
+  explicitCover: string | undefined,
+  photoPath: string | undefined,
+  id: string,
+  content: string,
+): string | undefined => {
+  const photoBase = (photoPath && photoPath.trim().length > 0)
+    ? photoPath
+    : buildDefaultPhotoBase(id);
+
+  if (explicitCover && explicitCover.trim().length > 0) {
+    return toAbsoluteImageUrl(explicitCover, photoBase);
+  }
+
+  const firstImage = extractFirstImageFromUnknown(content);
+  if (!firstImage) {
+    return undefined;
+  }
+
+  return toAbsoluteImageUrl(firstImage, photoBase);
+};
+
 const mapApiNewsItem = (item: Record<string, unknown>): News => {
   const id = String(item.id ?? item._id ?? "");
   const title = String(item.title ?? "Untitled");
@@ -54,6 +162,33 @@ const mapApiNewsItem = (item: Record<string, unknown>): News => {
           .filter(Boolean)
         : undefined;
 
+  const content =
+    typeof item.content === "string"
+      ? item.content
+      : typeof item.body === "string"
+        ? item.body
+        : typeof item.description === "string"
+          ? item.description
+          : "";
+
+  const photoPath =
+    typeof item.photoPath === "string"
+      ? item.photoPath
+      : typeof item.photo_path === "string"
+        ? item.photo_path
+        : undefined;
+
+  const explicitCover =
+    typeof item.coverImage === "string"
+      ? item.coverImage
+      : typeof item.thumbnail === "string"
+        ? item.thumbnail
+        : typeof item.image === "string"
+          ? item.image
+          : typeof item.photo_path === "string"
+            ? item.photo_path
+            : undefined;
+
   return {
     id,
     title,
@@ -70,30 +205,9 @@ const mapApiNewsItem = (item: Record<string, unknown>): News => {
         : typeof item.short_description === "string"
           ? item.short_description
           : undefined,
-    content:
-      typeof item.content === "string"
-        ? item.content
-        : typeof item.body === "string"
-          ? item.body
-          : typeof item.description === "string"
-            ? item.description
-            : "",
-    coverImage:
-      typeof item.coverImage === "string"
-        ? item.coverImage
-        : typeof item.thumbnail === "string"
-          ? item.thumbnail
-          : typeof item.image === "string"
-            ? item.image
-            : typeof item.photo_path === "string"
-              ? item.photo_path
-              : undefined,
-    photoPath:
-      typeof item.photoPath === "string"
-        ? item.photoPath
-        : typeof item.photo_path === "string"
-          ? item.photo_path
-          : undefined,
+    content,
+    coverImage: resolveCoverImage(explicitCover, photoPath, id, content),
+    photoPath,
     category: categoryRaw
       ? {
         id: String(categoryRaw.id ?? categoryRaw._id ?? ""),
