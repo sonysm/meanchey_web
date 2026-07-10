@@ -1,15 +1,11 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 import { AUTH_COOKIE_NAME, parseAuthSession } from "@/lib/auth";
 
 export async function GET() {
-    const cookieStore = await cookies();
-    const session = parseAuthSession(cookieStore.get(AUTH_COOKIE_NAME)?.value);
-
-    if (!session) {
-        return NextResponse.json({ data: null }, { status: 200 });
-    }
+    const cookie = cookies().get(AUTH_COOKIE_NAME)?.value;
+    const session = parseAuthSession(cookie);
 
     return NextResponse.json({ data: session });
 }
