@@ -1,4 +1,4 @@
-export const AUTH_COOKIE_NAME = "__Secure-meanchey-auth";
+export const AUTH_COOKIE_NAME = "meanchey-auth";
 
 export type AuthCompany = {
     id: number;
