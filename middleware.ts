@@ -9,9 +9,10 @@ const isProtectedArticleRoute = (pathname: string): boolean => {
     );
 };
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
     const { pathname, search } = request.nextUrl;
-    const session = parseAuthSession(request.cookies.get(AUTH_COOKIE_NAME)?.value);
+    const cookieStore = request.cookies;
+    const session = await parseAuthSession(cookieStore.get(AUTH_COOKIE_NAME)?.value);
 
     if (pathname === "/login") {
         if (session?.isEmployer) {
