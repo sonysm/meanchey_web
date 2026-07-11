@@ -77,6 +77,11 @@ Use PM2 to start your Next.js application. This will run it in the background an
 # Start the app with the name 'meanchey-web'
 pm2 start npm --name "meanchey-web" -- start
 
+#with ecosystem
+pm2 start ecosystem.config.js --env production
+
+
+
 # To ensure your app restarts on server reboot
 pm2 startup
 pm2 save
