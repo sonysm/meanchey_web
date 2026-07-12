@@ -1,4 +1,7 @@
-export const AUTH_COOKIE_NAME = "__Secure-meanchey-auth";
+export const AUTH_COOKIE_NAME =
+    process.env.NODE_ENV === "production"
+        ? "__Secure-meanchey-auth"
+        : "meanchey-auth";
 
 export type AuthCompany = {
     id: number;

@@ -33,14 +33,11 @@ export default async function NewsListPage() {
         <CardHeader>
           <CardTitle className="text-base">All Articles ({articles.length})</CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
-          <Table>
+        <CardContent className="p-0 overflow-x-auto">
+          <Table className="min-w-full">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[40%]">Title</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Views</TableHead>
+                <TableHead className="w-full">Title</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -72,21 +69,6 @@ export default async function NewsListPage() {
                         )}
                       </div>
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-muted-foreground">
-                      {news.category?.name ?? "—"}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full font-medium ${statusColors[news.status]}`}
-                    >
-                      {news.status}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm">{(news.viewCount ?? 0).toLocaleString()}</span>
                   </TableCell>
                   <TableCell>
                     <span className="text-sm text-muted-foreground">

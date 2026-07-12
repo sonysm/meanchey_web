@@ -33,7 +33,10 @@ const normalizeNewsStatus = (status: unknown): NewsStatus => {
 };
 
 const buildDefaultPhotoBase = (id: string): string => {
-  return `https://jobs.kramapost.com/storage/job/${id}`;
+  // Fallback base when `photoPath` isn't provided by the API.
+  // Article images uploaded/returned by the backend are served under:
+  // https://meanchey.org/storage/article/{id}/{image}
+  return `https://meanchey.org/storage/article/${id}`;
 };
 
 const toAbsoluteImageUrl = (image: string, photoBase: string): string => {
@@ -41,16 +44,18 @@ const toAbsoluteImageUrl = (image: string, photoBase: string): string => {
   if (!normalized) {
     return normalized;
   }
-
   if (
     normalized.startsWith("http://") ||
     normalized.startsWith("https://") ||
     normalized.startsWith("data:")
   ) {
+    console.debug("news.toAbsoluteImageUrl: already absolute or data url", { image: normalized });
     return normalized;
   }
 
-  return `${photoBase.replace(/\/$/, "")}/${normalized.replace(/^\//, "")}`;
+  const resolved = `${photoBase.replace(/\/$/, "")}/${normalized.replace(/^\//, "")}`;
+  console.debug("news.toAbsoluteImageUrl: resolved url", { image: normalized, photoBase, resolved });
+  return resolved;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
@@ -122,22 +127,28 @@ const resolveCoverImage = (
   explicitCover: string | undefined,
   photoPath: string | undefined,
   id: string,
-  content: string,
+  contentAny: unknown,
 ): string | undefined => {
   const photoBase = (photoPath && photoPath.trim().length > 0)
     ? photoPath
     : buildDefaultPhotoBase(id);
+  console.debug("news.resolveCoverImage: inputs", { explicitCover, photoPath, id, contentAny });
 
   if (explicitCover && explicitCover.trim().length > 0) {
-    return toAbsoluteImageUrl(explicitCover, photoBase);
+    const resolved = toAbsoluteImageUrl(explicitCover, photoBase);
+    //console.debug("news.resolveCoverImage: using explicit cover", { explicitCover, resolved });
+    return resolved;
   }
 
-  const firstImage = extractFirstImageFromUnknown(content);
+  const firstImage = extractFirstImageFromUnknown(contentAny);
+  //console.debug("news.resolveCoverImage: extracted firstImage", { firstImage });
   if (!firstImage) {
     return undefined;
   }
 
-  return toAbsoluteImageUrl(firstImage, photoBase);
+  const resolvedFirst = toAbsoluteImageUrl(firstImage, photoBase);
+  //console.debug("news.resolveCoverImage: resolved first image", { firstImage, resolvedFirst });
+  return resolvedFirst;
 };
 
 const mapApiNewsItem = (item: Record<string, unknown>): News => {
@@ -152,15 +163,29 @@ const mapApiNewsItem = (item: Record<string, unknown>): News => {
     item.publish_status ??
     item.state ??
     (item.active === true || item.active === 1 ? "published" : undefined);
-  const tags =
-    Array.isArray(item.tags)
-      ? item.tags.filter((tag): tag is string => typeof tag === "string")
-      : typeof item.tag === "string"
-        ? item.tag
-          .split(",")
-          .map((tag) => tag.trim())
-          .filter(Boolean)
-        : undefined;
+  const parsePossibleTagValue = (val: unknown): string[] | undefined => {
+    if (Array.isArray(val)) {
+      return val.filter((t): t is string => typeof t === "string");
+    }
+    if (typeof val === "string") {
+      const text = val.trim();
+      if (!text) return undefined;
+      // try JSON parse for stringified arrays
+      try {
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((t): t is string => typeof t === "string").map((t) => t.trim()).filter(Boolean);
+        }
+      } catch {
+        // not JSON, fallthrough
+      }
+      // fallback: comma separated
+      return text.split(",").map((t) => t.trim()).filter(Boolean);
+    }
+    return undefined;
+  };
+
+  const tags = parsePossibleTagValue(item.tags) ?? parsePossibleTagValue(item.tag) ?? undefined;
 
   const content =
     typeof item.content === "string"
@@ -177,17 +202,24 @@ const mapApiNewsItem = (item: Record<string, unknown>): News => {
       : typeof item.photo_path === "string"
         ? item.photo_path
         : undefined;
-
+  // The API can return several possible thumbnail keys. Prefer explicit cover
+  // fields commonly used by backend: `coverImage`, `thumbnail`, `thumb`,
+  // `thumb_url`, `image`. If `photoPath` is provided it will be used as the
+  // base for concatenation (photoPath + thumb).
   const explicitCover =
     typeof item.coverImage === "string"
       ? item.coverImage
       : typeof item.thumbnail === "string"
         ? item.thumbnail
-        : typeof item.image === "string"
-          ? item.image
-          : typeof item.photo_path === "string"
-            ? item.photo_path
-            : undefined;
+        : typeof (item as any).thumb === "string"
+          ? (item as any).thumb
+          : typeof (item as any).thumb_url === "string"
+            ? (item as any).thumb_url
+            : typeof item.image === "string"
+              ? item.image
+              : typeof item.photo_path === "string"
+                ? item.photo_path
+                : undefined;
 
   return {
     id,
@@ -206,7 +238,7 @@ const mapApiNewsItem = (item: Record<string, unknown>): News => {
           ? item.short_description
           : undefined,
     content,
-    coverImage: resolveCoverImage(explicitCover, photoPath, id, content),
+    coverImage: resolveCoverImage(explicitCover, photoPath, id, item),
     photoPath,
     category: categoryRaw
       ? {

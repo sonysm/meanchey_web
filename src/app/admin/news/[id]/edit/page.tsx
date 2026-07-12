@@ -86,13 +86,29 @@ export default function EditNewsPage({
             article.content && article.content.trim().length > 0
               ? article.content
               : JSON.stringify({ ops: [{ insert: "\n" }] }),
-          tags: Array.isArray(article.tags)
-            ? article.tags
-            : Array.isArray(article.tag)
-              ? article.tag
-              : typeof article.tag === "string"
-                ? article.tag.split(",").map((tag) => tag.trim()).filter(Boolean)
-                : [],
+          tags: (() => {
+            const parsePossibleTagValue = (val: unknown): string[] | undefined => {
+              if (Array.isArray(val)) {
+                return val.filter((t): t is string => typeof t === "string");
+              }
+              if (typeof val === "string") {
+                const text = val.trim();
+                if (!text) return undefined;
+                try {
+                  const parsed = JSON.parse(text);
+                  if (Array.isArray(parsed)) {
+                    return parsed.filter((t): t is string => typeof t === "string").map((t) => t.trim()).filter(Boolean);
+                  }
+                } catch {
+                  // not JSON
+                }
+                return text.split(",").map((tag) => tag.trim()).filter(Boolean);
+              }
+              return undefined;
+            };
+
+            return parsePossibleTagValue(article.tags) ?? parsePossibleTagValue(article.tag) ?? [];
+          })(),
         });
       } catch (error) {
         setLoadError(error instanceof Error ? error.message : "Failed to load article");

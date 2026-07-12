@@ -70,15 +70,24 @@ const normalizeTextInsert = (value: unknown): DeltaOperation | null => {
 };
 
 const resolveImageUrl = (imageName: string, imageBaseUrl?: string): string => {
-    if (imageName.startsWith("http://") || imageName.startsWith("https://")) {
+    try {
+        if (imageName.startsWith("http://") || imageName.startsWith("https://")) {
+            console.debug("QuillEditor.resolveImageUrl: absolute image used", { imageName });
+            return imageName;
+        }
+
+        if (!imageBaseUrl) {
+            console.debug("QuillEditor.resolveImageUrl: no base, returning raw imageName", { imageName });
+            return imageName;
+        }
+
+        const resolved = `${imageBaseUrl.replace(/\/$/, "")}/${imageName}`;
+        console.debug("QuillEditor.resolveImageUrl: resolved image url", { imageName, imageBaseUrl, resolved });
+        return resolved;
+    } catch (err) {
+        console.debug("QuillEditor.resolveImageUrl: error resolving image", { imageName, imageBaseUrl, err });
         return imageName;
     }
-
-    if (!imageBaseUrl) {
-        return imageName;
-    }
-
-    return `${imageBaseUrl.replace(/\/$/, "")}/${imageName}`;
 };
 
 const detailToDelta = (details: ArticleDetailItem[], imageBaseUrl?: string): DeltaLike => {
@@ -365,6 +374,7 @@ export default function QuillEditor({
             throw new Error("Image upload response is invalid");
         }
 
+        console.debug("QuillEditor.uploadImage: upload response imageName", { imageName, imgs });
         return imageName;
     }, []);
 
