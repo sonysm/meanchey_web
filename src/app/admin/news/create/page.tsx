@@ -66,7 +66,7 @@ export default function CreateNewsPage() {
       setLoadError(null);
 
       try {
-        const response = await fetch("/api/auth/session");
+        const response = await fetch("/api/auth/session", { credentials: "include" });
         const payload = (await response.json().catch(() => ({}))) as { data?: AuthSession | null };
 
         if (!response.ok) {
@@ -108,6 +108,7 @@ export default function CreateNewsPage() {
 
     const response = await fetch("/api/admin/articles", {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },

@@ -345,6 +345,7 @@ export default function QuillEditor({
 
         const response = await fetch("/api/admin/articles/images", {
             method: "POST",
+            credentials: "include",
             body: formData,
         });
 
