@@ -163,25 +163,25 @@ export async function POST(request: NextRequest) {
         data: authSession,
     });
 
-    // response.cookies.set({
-    //     name: AUTH_COOKIE_NAME,
-    //     value: serializeAuthSession(authSession),
-    //     httpOnly: true,
-    //     sameSite: "lax",
-    //     secure: process.env.NODE_ENV === "production",
-    //     path: "/",
-    //     maxAge: 60 * 60 * 24 * 14,
-    // });
-
     response.cookies.set({
-        name: 'debug-meanchey-auth',
+        name: AUTH_COOKIE_NAME,
         value: serializeAuthSession(authSession),
-        httpOnly: false,
-        sameSite: 'lax',
-        secure: false,
-        path: '/',
-        maxAge: 60 * 60
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 14,
     });
+
+    // response.cookies.set({
+    //     name: 'debug-meanchey-auth',
+    //     value: serializeAuthSession(authSession),
+    //     httpOnly: false,
+    //     sameSite: 'lax',
+    //     secure: false,
+    //     path: '/',
+    //     maxAge: 60 * 60
+    // });
 
     return response;
 }
