@@ -175,6 +175,36 @@ const readJson = async (response: Response): Promise<unknown> => {
     }
 };
 
+type DeleteBodyKind = "json" | "form";
+
+const buildDeleteJsonPayload = (id: string | number, companyId: number | undefined, loginToken: string) => {
+    return {
+        id,
+        article_id: id,
+        aid: id,
+        cid: companyId,
+        company_id: companyId,
+        login_token: loginToken,
+        access_token: loginToken,
+        country_code: "kh",
+    };
+};
+
+const buildDeleteFormPayload = (id: string | number, companyId: number | undefined, loginToken: string) => {
+    const formData = new FormData();
+    formData.append("id", String(id));
+    formData.append("article_id", String(id));
+    formData.append("aid", String(id));
+    if (companyId && companyId > 0) {
+        formData.append("cid", String(companyId));
+        formData.append("company_id", String(companyId));
+    }
+    formData.append("login_token", loginToken);
+    formData.append("access_token", loginToken);
+    formData.append("country_code", "kh");
+    return formData;
+};
+
 const resolveSessionUserId = async (
     loginToken: string,
     existingUserId?: number,
@@ -371,43 +401,68 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
         );
     }
 
-    const payload = {
-        id: Number(id) || id,
-        cid: session.companyId,
-        login_token: session.loginToken,
-        access_token: session.loginToken,
-    };
-
+    const resolvedId = Number(id) || id;
     const deleteEndpointCandidates = [
         "/article-delete",
         "/article-remove",
+        "/article/delete",
+        "/article/remove",
+        `/article-delete/${resolvedId}`,
+        `/article-remove/${resolvedId}`,
+        `/article/delete/${resolvedId}`,
+        `/article/remove/${resolvedId}`,
+    ];
+
+    const requestCandidates: Array<{ method: "POST" | "DELETE"; bodyKind: DeleteBodyKind }> = [
+        { method: "POST", bodyKind: "json" },
+        { method: "POST", bodyKind: "form" },
+        { method: "DELETE", bodyKind: "json" },
+        { method: "DELETE", bodyKind: "form" },
     ];
 
     let lastStatus = 502;
     let lastData: unknown = null;
+    const attempts: string[] = [];
 
     for (const endpoint of deleteEndpointCandidates) {
-        const url = new URL(endpoint, API_BASE_URL);
-        const response = await fetch(url.toString(), {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
-        });
+        for (const candidate of requestCandidates) {
+            const url = new URL(endpoint, API_BASE_URL);
+            const isJson = candidate.bodyKind === "json";
+            const body = isJson
+                ? JSON.stringify(buildDeleteJsonPayload(resolvedId, session.companyId, session.loginToken))
+                : buildDeleteFormPayload(resolvedId, session.companyId, session.loginToken);
+            const headers = isJson ? { "Content-Type": "application/json" } : undefined;
 
-        const data = await readJson(response);
-        if (response.ok) {
-            revalidatePath("/admin");
-            revalidatePath("/admin/news");
-            return NextResponse.json({ message: "Article deleted", data });
-        }
+            attempts.push(`${candidate.method} ${endpoint} (${candidate.bodyKind})`);
 
-        lastStatus = response.status;
-        lastData = data;
+            const response = await fetch(url.toString(), {
+                method: candidate.method,
+                headers,
+                body,
+            });
 
-        if (response.status !== 404) {
-            break;
+            const data = await readJson(response);
+            if (response.ok) {
+                revalidatePath("/admin");
+                revalidatePath("/admin/news");
+                return NextResponse.json({ message: "Article deleted", data });
+            }
+
+            lastStatus = response.status;
+            lastData = data;
+
+            // Keep trying alternative endpoint/method combinations for route/method mismatches.
+            if (response.status === 404 || response.status === 405) {
+                continue;
+            }
+
+            return NextResponse.json(
+                {
+                    message: extractMessage(data, `Failed to delete article (${response.status})`),
+                    data,
+                },
+                { status: response.status },
+            );
         }
     }
 
@@ -415,6 +470,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
         {
             message: extractMessage(lastData, `Failed to delete article (${lastStatus})`),
             data: lastData,
+            attempts,
         },
         { status: lastStatus },
     );
