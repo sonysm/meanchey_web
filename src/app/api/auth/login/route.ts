@@ -147,11 +147,15 @@ export async function POST(request: NextRequest) {
     const companyId = getCompanyId(profileRecord);
     const isEmployer = resolveEmployerFlag(profileRecord, loginRecord);
     const userTypeId = getNumberValue(profileRecord, ["user_type_id", "userTypeId"]);
+    const userId =
+        getNumberValue(profileRecord, ["user_id", "userId", "id", "uid"]) ||
+        (loginRecord ? getNumberValue(loginRecord, ["user_id", "userId", "id", "uid"]) : 0);
 
     const authSession = {
         loginToken,
         userTypeId,
         isEmployer,
+        userId: userId > 0 ? userId : undefined,
         displayName: getStringValue(profileRecord, ["display_name", "displayName", "name"]),
         email: getStringValue(profileRecord, ["email"]),
         companyId,

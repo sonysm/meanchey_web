@@ -33,7 +33,7 @@ export default function EditNewsPage({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isLoadingArticle, setIsLoadingArticle] = useState(true);
   const [imageBaseUrl, setImageBaseUrl] = useState<string>(
-    `https://jobs.kramapost.com/storage/job/${id}`,
+    `https://meanchey.org/storage/article/${id}`,
   );
   const [imageUploadState, setImageUploadState] = useState({ uploading: 0, failed: 0 });
 
@@ -58,7 +58,9 @@ export default function EditNewsPage({
       setLoadError(null);
 
       try {
-        const response = await fetch(`/api/admin/articles/${id}`);
+        const response = await fetch(`/api/admin/articles/${id}`, {
+          credentials: "include",
+        });
         if (!response.ok) {
           throw new Error("Failed to load article");
         }
@@ -78,7 +80,7 @@ export default function EditNewsPage({
           throw new Error("Article not found");
         }
 
-        setImageBaseUrl(article.photoPath ?? `https://jobs.kramapost.com/storage/job/${id}`);
+        setImageBaseUrl(article.photoPath ?? `https://meanchey.org/storage/article/${id}`);
 
         reset({
           title: article.title ?? "",
@@ -130,6 +132,7 @@ export default function EditNewsPage({
 
     const response = await fetch(`/api/admin/articles/${id}`, {
       method: "PATCH",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },

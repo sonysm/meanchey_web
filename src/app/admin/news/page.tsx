@@ -1,6 +1,8 @@
 import { getNews, statusColors } from "@/lib/news";
+import { AUTH_COOKIE_NAME, parseAuthSession } from "@/lib/auth";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { cookies } from "next/headers";
 import {
   Table,
   TableBody,
@@ -13,6 +15,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Pencil, Eye, Trash2 } from "lucide-react";
 
 export default async function NewsListPage() {
+  const cookieStore = await cookies();
+  const session = parseAuthSession(cookieStore.get(AUTH_COOKIE_NAME)?.value);
+  const currentUserId = session?.userId ? String(session.userId) : "";
   const articles = await getNews(50, 0);
 
   return (
@@ -82,18 +87,22 @@ export default async function NewsListPage() {
                           <Eye size={15} />
                         </Button>
                       </Link>
-                      <Link href={`/admin/news/${news.id}/edit`}>
-                        <Button variant="ghost" size="icon">
-                          <Pencil size={15} />
+                      {currentUserId && news.authorId === currentUserId ? (
+                        <Link href={`/admin/news/${news.id}/edit`}>
+                          <Button variant="ghost" size="icon">
+                            <Pencil size={15} />
+                          </Button>
+                        </Link>
+                      ) : null}
+                      {currentUserId && news.authorId === currentUserId ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 size={15} />
                         </Button>
-                      </Link>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 size={15} />
-                      </Button>
+                      ) : null}
                     </div>
                   </TableCell>
                 </TableRow>

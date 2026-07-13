@@ -12,6 +12,7 @@ export type AuthSession = {
     loginToken: string;
     userTypeId: number;
     isEmployer: boolean;
+    userId?: number;
     displayName?: string;
     email?: string;
     companyId?: number;
@@ -20,7 +21,7 @@ export type AuthSession = {
 
 type PersistedAuthSession = Pick<
     AuthSession,
-    "loginToken" | "userTypeId" | "isEmployer" | "displayName" | "email" | "companyId"
+    "loginToken" | "userTypeId" | "isEmployer" | "userId" | "displayName" | "email" | "companyId"
 >;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
@@ -81,6 +82,7 @@ export const parseAuthSession = (value: string | undefined | null): AuthSession 
         }
 
         const userTypeId = firstNumber(parsed, ["userTypeId", "user_type_id"]);
+        const userId = firstNumber(parsed, ["userId", "user_id", "id", "uid"]);
         const companyId = firstNumber(parsed, ["companyId", "company_id", "cid"]);
 
         return {
@@ -88,6 +90,7 @@ export const parseAuthSession = (value: string | undefined | null): AuthSession 
             userTypeId,
             isEmployer:
                 Number(parsed.isEmployer) === 1 || parsed.isEmployer === true || userTypeId === 1,
+            userId: userId > 0 ? userId : undefined,
             displayName: firstString(parsed, ["displayName", "display_name", "name"]),
             email: firstString(parsed, ["email"]),
             companyId: companyId > 0 ? companyId : undefined,
@@ -104,6 +107,7 @@ export const serializeAuthSession = (session: AuthSession): string => {
         loginToken: session.loginToken,
         userTypeId: session.userTypeId,
         isEmployer: session.isEmployer,
+        userId: session.userId,
         displayName: session.displayName,
         email: session.email,
         companyId: session.companyId,

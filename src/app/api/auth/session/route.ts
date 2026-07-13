@@ -63,10 +63,12 @@ export async function GET() {
         }
 
         const userTypeId = getNumberValue(profileRecord, ["user_type_id", "userTypeId"]);
+        const userId = getNumberValue(profileRecord, ["user_id", "userId", "id", "uid"]);
         const nextSession = {
             ...session,
             userTypeId: userTypeId > 0 ? userTypeId : session.userTypeId,
             isEmployer: resolveEmployerFlag(profileRecord) || session.isEmployer,
+            userId: userId > 0 ? userId : session.userId,
             displayName:
                 getStringValue(profileRecord, ["display_name", "displayName", "name"]) ||
                 session.displayName,

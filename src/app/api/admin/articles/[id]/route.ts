@@ -121,12 +121,35 @@ const toTagPayload = (tags?: string | string[]): string[] => {
         .filter(Boolean);
 };
 
-export async function GET(_request: NextRequest, context: RouteContext) {
+const isOwnedByUser = (authorId: string, userId: number | undefined): boolean => {
+    if (!authorId || !userId || userId <= 0) {
+        return false;
+    }
+
+    return authorId === String(userId);
+};
+
+export async function GET(request: NextRequest, context: RouteContext) {
+    const session = getAuthSessionFromCookieValue(request.cookies.get(AUTH_COOKIE_NAME)?.value);
+    if (!session?.isEmployer || !session.loginToken || !session.userId) {
+        return NextResponse.json(
+            { message: "Employer login is required" },
+            { status: 401 },
+        );
+    }
+
     const { id } = await context.params;
     const article = await getNewsById(id);
 
     if (!article) {
         return NextResponse.json({ message: "Article not found" }, { status: 404 });
+    }
+
+    if (!isOwnedByUser(article.authorId, session.userId)) {
+        return NextResponse.json(
+            { message: "You can only edit your own articles" },
+            { status: 403 },
+        );
     }
 
     return NextResponse.json({ data: article });
@@ -142,7 +165,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const session = getAuthSessionFromCookieValue(request.cookies.get(AUTH_COOKIE_NAME)?.value);
 
-    if (!session?.isEmployer || !session.loginToken || !session.companyId) {
+    if (!session?.isEmployer || !session.loginToken || !session.companyId || !session.userId) {
         return NextResponse.json(
             { message: "Employer login is required" },
             { status: 401 },
@@ -159,6 +182,18 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const title = (body.title ?? "").trim();
     if (!title) {
         return NextResponse.json({ message: "Title is required" }, { status: 400 });
+    }
+
+    const article = await getNewsById(id);
+    if (!article) {
+        return NextResponse.json({ message: "Article not found" }, { status: 404 });
+    }
+
+    if (!isOwnedByUser(article.authorId, session.userId)) {
+        return NextResponse.json(
+            { message: "You can only edit your own articles" },
+            { status: 403 },
+        );
     }
 
     const payload = {

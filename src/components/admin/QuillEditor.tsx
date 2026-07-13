@@ -50,6 +50,80 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
     return typeof value === "object" && value !== null;
 };
 
+type JsonParseResult =
+    | { ok: true; value: unknown }
+    | { ok: false };
+
+const escapeControlCharsInJsonStrings = (input: string): string => {
+    let output = "";
+    let inString = false;
+    let escaped = false;
+
+    for (const char of input) {
+        if (!inString) {
+            output += char;
+            if (char === '"') {
+                inString = true;
+            }
+            continue;
+        }
+
+        if (escaped) {
+            output += char;
+            escaped = false;
+            continue;
+        }
+
+        if (char === "\\") {
+            output += char;
+            escaped = true;
+            continue;
+        }
+
+        if (char === '"') {
+            output += char;
+            inString = false;
+            continue;
+        }
+
+        if (char === "\n") {
+            output += "\\n";
+            continue;
+        }
+
+        if (char === "\r") {
+            output += "\\r";
+            continue;
+        }
+
+        if (char === "\t") {
+            output += "\\t";
+            continue;
+        }
+
+        output += char;
+    }
+
+    return output;
+};
+
+const parseJsonWithRepair = (text: string): JsonParseResult => {
+    try {
+        return { ok: true, value: JSON.parse(text) as unknown };
+    } catch {
+        const repaired = escapeControlCharsInJsonStrings(text);
+        if (repaired === text) {
+            return { ok: false };
+        }
+
+        try {
+            return { ok: true, value: JSON.parse(repaired) as unknown };
+        } catch {
+            return { ok: false };
+        }
+    }
+};
+
 const normalizeTextInsert = (value: unknown): DeltaOperation | null => {
     if (isRecord(value) && "insert" in value) {
         return value as DeltaOperation;
@@ -138,12 +212,12 @@ const parseDelta = (value: string, imageBaseUrl?: string): DeltaLike | null => {
                 return null;
             }
 
-            try {
-                const parsed = JSON.parse(text) as unknown;
-                return parseUnknown(parsed, depth + 1);
-            } catch {
+            const parsed = parseJsonWithRepair(text);
+            if (!parsed.ok) {
                 return null;
             }
+
+            return parseUnknown(parsed.value, depth + 1);
         }
 
         if (isRecord(input)) {

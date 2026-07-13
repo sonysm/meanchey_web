@@ -256,6 +256,14 @@ const mapApiNewsItem = (item: Record<string, unknown>): News => {
     status: normalizeNewsStatus(statusRaw),
     authorId: String(item.authorId ?? item.user_id ?? item.author_id ?? ""),
     authorName: String(item.authorName ?? item.author ?? item.user_name ?? ""),
+    companyName:
+      typeof item.companyName === "string"
+        ? item.companyName
+        : typeof item.company_name === "string"
+          ? item.company_name
+          : typeof (item.company as Record<string, unknown> | undefined)?.name === "string"
+            ? String((item.company as Record<string, unknown>).name)
+            : undefined,
     publishedAt:
       typeof item.publishedAt === "string"
         ? item.publishedAt
