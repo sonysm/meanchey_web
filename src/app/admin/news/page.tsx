@@ -12,7 +12,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Pencil, Eye, Trash2 } from "lucide-react";
+import { Pencil, Eye } from "lucide-react";
+import DeleteArticleButton from "@/components/admin/DeleteArticleButton";
 
 export default async function NewsListPage() {
   const cookieStore = await cookies();
@@ -95,13 +96,7 @@ export default async function NewsListPage() {
                         </Link>
                       ) : null}
                       {currentUserId && news.authorId === currentUserId ? (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 size={15} />
-                        </Button>
+                        <DeleteArticleButton articleId={news.id} title={news.title} />
                       ) : null}
                     </div>
                   </TableCell>

@@ -1,5 +1,11 @@
 import { getNewsById } from "@/lib/news";
-import { AUTH_COOKIE_NAME, getAuthSessionFromCookieValue } from "@/lib/auth";
+import {
+    AUTH_COOKIE_NAME,
+    getAuthSessionFromCookieValue,
+    getFirstRecord,
+    getNumberValue,
+} from "@/lib/auth";
+import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
 
 type RouteContext = {
@@ -129,9 +135,96 @@ const isOwnedByUser = (authorId: string, userId: number | undefined): boolean =>
     return authorId === String(userId);
 };
 
+const extractMessage = (value: unknown, fallback: string): string => {
+    if (typeof value === "string" && value.trim().length > 0) {
+        return value;
+    }
+
+    if (isRecord(value)) {
+        const nestedData = isRecord(value.data) ? value.data : null;
+        const message =
+            value.message ??
+            value.error ??
+            value.detail ??
+            value.msg ??
+            value.error_message ??
+            nestedData?.message ??
+            nestedData?.error ??
+            nestedData?.detail ??
+            nestedData?.msg ??
+            nestedData?.error_message;
+        if (typeof message === "string" && message.trim().length > 0) {
+            return message;
+        }
+    }
+
+    return fallback;
+};
+
+const readJson = async (response: Response): Promise<unknown> => {
+    const raw = await response.text();
+
+    if (!raw) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(raw) as unknown;
+    } catch {
+        return raw;
+    }
+};
+
+const resolveSessionUserId = async (
+    loginToken: string,
+    existingUserId?: number,
+): Promise<number | undefined> => {
+    if (existingUserId && existingUserId > 0) {
+        return existingUserId;
+    }
+
+    if (!API_BASE_URL) {
+        return undefined;
+    }
+
+    try {
+        const profileResponse = await fetch(new URL("/profile", API_BASE_URL), {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ login_token: loginToken }),
+            cache: "no-store",
+        });
+
+        if (!profileResponse.ok) {
+            return undefined;
+        }
+
+        const profileData = await readJson(profileResponse);
+        const profileRecord = getFirstRecord(profileData);
+        if (!profileRecord) {
+            return undefined;
+        }
+
+        const userId = getNumberValue(profileRecord, ["user_id", "userId", "id", "uid"]);
+        return userId > 0 ? userId : undefined;
+    } catch {
+        return undefined;
+    }
+};
+
 export async function GET(request: NextRequest, context: RouteContext) {
     const session = getAuthSessionFromCookieValue(request.cookies.get(AUTH_COOKIE_NAME)?.value);
-    if (!session?.isEmployer || !session.loginToken || !session.userId) {
+    if (!session?.isEmployer || !session.loginToken) {
+        return NextResponse.json(
+            { message: "Employer login is required" },
+            { status: 401 },
+        );
+    }
+
+    const sessionUserId = await resolveSessionUserId(session.loginToken, session.userId);
+    if (!sessionUserId) {
         return NextResponse.json(
             { message: "Employer login is required" },
             { status: 401 },
@@ -145,7 +238,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         return NextResponse.json({ message: "Article not found" }, { status: 404 });
     }
 
-    if (!isOwnedByUser(article.authorId, session.userId)) {
+    if (!isOwnedByUser(article.authorId, sessionUserId)) {
         return NextResponse.json(
             { message: "You can only edit your own articles" },
             { status: 403 },
@@ -165,7 +258,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const session = getAuthSessionFromCookieValue(request.cookies.get(AUTH_COOKIE_NAME)?.value);
 
-    if (!session?.isEmployer || !session.loginToken || !session.companyId || !session.userId) {
+    if (!session?.isEmployer || !session.loginToken || !session.companyId) {
+        return NextResponse.json(
+            { message: "Employer login is required" },
+            { status: 401 },
+        );
+    }
+
+    const sessionUserId = await resolveSessionUserId(session.loginToken, session.userId);
+    if (!sessionUserId) {
         return NextResponse.json(
             { message: "Employer login is required" },
             { status: 401 },
@@ -189,7 +290,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         return NextResponse.json({ message: "Article not found" }, { status: 404 });
     }
 
-    if (!isOwnedByUser(article.authorId, session.userId)) {
+    if (!isOwnedByUser(article.authorId, sessionUserId)) {
         return NextResponse.json(
             { message: "You can only edit your own articles" },
             { status: 403 },
@@ -230,4 +331,91 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     return NextResponse.json({ message: "Article updated", data });
+}
+
+export async function DELETE(request: NextRequest, context: RouteContext) {
+    if (!API_BASE_URL) {
+        return NextResponse.json(
+            { message: "MEANCHEY_API_BASE_URL is not configured" },
+            { status: 500 },
+        );
+    }
+
+    const session = getAuthSessionFromCookieValue(request.cookies.get(AUTH_COOKIE_NAME)?.value);
+
+    if (!session?.isEmployer || !session.loginToken) {
+        return NextResponse.json(
+            { message: "Employer login is required" },
+            { status: 401 },
+        );
+    }
+
+    const sessionUserId = await resolveSessionUserId(session.loginToken, session.userId);
+    if (!sessionUserId) {
+        return NextResponse.json(
+            { message: "Employer login is required" },
+            { status: 401 },
+        );
+    }
+
+    const { id } = await context.params;
+    const article = await getNewsById(id);
+    if (!article) {
+        return NextResponse.json({ message: "Article not found" }, { status: 404 });
+    }
+
+    if (!isOwnedByUser(article.authorId, sessionUserId)) {
+        return NextResponse.json(
+            { message: "You can only delete your own articles" },
+            { status: 403 },
+        );
+    }
+
+    const payload = {
+        id: Number(id) || id,
+        cid: session.companyId,
+        login_token: session.loginToken,
+        access_token: session.loginToken,
+    };
+
+    const deleteEndpointCandidates = [
+        "/article-delete",
+        "/article-remove",
+    ];
+
+    let lastStatus = 502;
+    let lastData: unknown = null;
+
+    for (const endpoint of deleteEndpointCandidates) {
+        const url = new URL(endpoint, API_BASE_URL);
+        const response = await fetch(url.toString(), {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+        });
+
+        const data = await readJson(response);
+        if (response.ok) {
+            revalidatePath("/admin");
+            revalidatePath("/admin/news");
+            return NextResponse.json({ message: "Article deleted", data });
+        }
+
+        lastStatus = response.status;
+        lastData = data;
+
+        if (response.status !== 404) {
+            break;
+        }
+    }
+
+    return NextResponse.json(
+        {
+            message: extractMessage(lastData, `Failed to delete article (${lastStatus})`),
+            data: lastData,
+        },
+        { status: lastStatus },
+    );
 }

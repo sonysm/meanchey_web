@@ -12,7 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { Eye, Pencil } from "lucide-react";
+import DeleteArticleButton from "@/components/admin/DeleteArticleButton";
 
 export default async function AdminDashboard() {
   const cookieStore = await cookies();
@@ -103,14 +104,7 @@ export default async function AdminDashboard() {
                           </Link>
                         ) : null}
                         {currentUserId && news.authorId === currentUserId ? (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive hover:text-destructive"
-                            aria-label={`Delete ${news.title}`}
-                          >
-                            <Trash2 size={15} />
-                          </Button>
+                          <DeleteArticleButton articleId={news.id} title={news.title} />
                         ) : null}
                       </div>
                     </TableCell>
