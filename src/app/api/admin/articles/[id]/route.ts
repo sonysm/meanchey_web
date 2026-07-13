@@ -177,31 +177,19 @@ const readJson = async (response: Response): Promise<unknown> => {
 
 type DeleteBodyKind = "json" | "form";
 
-const buildDeleteJsonPayload = (id: string | number, companyId: number | undefined, loginToken: string) => {
+const buildDeleteJsonPayload = (id: string | number, loginToken: string) => {
     return {
         id,
-        article_id: id,
-        aid: id,
-        cid: companyId,
-        company_id: companyId,
         login_token: loginToken,
         access_token: loginToken,
-        country_code: "kh",
     };
 };
 
-const buildDeleteFormPayload = (id: string | number, companyId: number | undefined, loginToken: string) => {
+const buildDeleteFormPayload = (id: string | number, loginToken: string) => {
     const formData = new FormData();
     formData.append("id", String(id));
-    formData.append("article_id", String(id));
-    formData.append("aid", String(id));
-    if (companyId && companyId > 0) {
-        formData.append("cid", String(companyId));
-        formData.append("company_id", String(companyId));
-    }
     formData.append("login_token", loginToken);
     formData.append("access_token", loginToken);
-    formData.append("country_code", "kh");
     return formData;
 };
 
@@ -403,7 +391,10 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
     const resolvedId = Number(id) || id;
     const deleteEndpointCandidates = [
+        // Primary endpoint used by mobile app contract.
+        "/article-del",
         "/article-delete",
+        // Common fallbacks across API variants.
         "/article-remove",
         "/article/delete",
         "/article/remove",
@@ -414,6 +405,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     ];
 
     const requestCandidates: Array<{ method: "POST" | "DELETE"; bodyKind: DeleteBodyKind }> = [
+        // Keep first attempt identical to mobile app behavior.
         { method: "POST", bodyKind: "json" },
         { method: "POST", bodyKind: "form" },
         { method: "DELETE", bodyKind: "json" },
@@ -429,8 +421,8 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
             const url = new URL(endpoint, API_BASE_URL);
             const isJson = candidate.bodyKind === "json";
             const body = isJson
-                ? JSON.stringify(buildDeleteJsonPayload(resolvedId, session.companyId, session.loginToken))
-                : buildDeleteFormPayload(resolvedId, session.companyId, session.loginToken);
+                ? JSON.stringify(buildDeleteJsonPayload(resolvedId, session.loginToken))
+                : buildDeleteFormPayload(resolvedId, session.loginToken);
             const headers = isJson ? { "Content-Type": "application/json" } : undefined;
 
             attempts.push(`${candidate.method} ${endpoint} (${candidate.bodyKind})`);
