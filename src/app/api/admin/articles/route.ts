@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { AUTH_COOKIE_NAME, getAuthSessionFromCookieValue } from "@/lib/auth";
+import {
+    AUTH_COOKIE_NAME,
+    getAuthCompanies,
+    getAuthSessionFromCookieValue,
+    getFirstRecord,
+} from "@/lib/auth";
 
 const API_BASE_URL = process.env.MEANCHEY_API_BASE_URL;
 
@@ -43,6 +48,61 @@ const extractMessage = (value: unknown, fallback: string): string => {
     }
 
     return fallback;
+};
+
+const readJson = async (response: Response): Promise<unknown> => {
+    const raw = await response.text();
+
+    if (!raw) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(raw) as unknown;
+    } catch {
+        return raw;
+    }
+};
+
+const loadAllowedCompanyIds = async (loginToken: string, cookieCompanyIds: number[]): Promise<Set<number>> => {
+    const allowedCompanyIds = new Set(
+        cookieCompanyIds
+            .map((companyId) => Number(companyId))
+            .filter((companyId) => Number.isFinite(companyId) && companyId > 0),
+    );
+
+    if (allowedCompanyIds.size > 0 || !API_BASE_URL) {
+        return allowedCompanyIds;
+    }
+
+    try {
+        const profileResponse = await fetch(new URL("/profile", API_BASE_URL), {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ login_token: loginToken }),
+            cache: "no-store",
+        });
+
+        if (!profileResponse.ok) {
+            return allowedCompanyIds;
+        }
+
+        const profileData = await readJson(profileResponse);
+        const profileRecord = getFirstRecord(profileData);
+        if (!profileRecord) {
+            return allowedCompanyIds;
+        }
+
+        for (const company of getAuthCompanies(profileRecord)) {
+            allowedCompanyIds.add(company.id);
+        }
+    } catch {
+        return allowedCompanyIds;
+    }
+
+    return allowedCompanyIds;
 };
 
 const getStringField = (value: unknown): string | null => {
@@ -384,7 +444,10 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ message: "Title is required" }, { status: 400 });
     }
 
-    const allowedCompanyIds = new Set((session.companies ?? []).map((company) => company.id));
+    const allowedCompanyIds = await loadAllowedCompanyIds(
+        session.loginToken,
+        (session.companies ?? []).map((company) => company.id),
+    );
     if (allowedCompanyIds.size === 0) {
         return NextResponse.json(
             { message: "No host company is linked to this account" },

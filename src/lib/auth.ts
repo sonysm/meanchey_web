@@ -18,6 +18,11 @@ export type AuthSession = {
     companies?: AuthCompany[];
 };
 
+type PersistedAuthSession = Pick<
+    AuthSession,
+    "loginToken" | "userTypeId" | "isEmployer" | "displayName" | "email" | "companyId"
+>;
+
 const isRecord = (value: unknown): value is Record<string, unknown> => {
     return typeof value === "object" && value !== null;
 };
@@ -94,7 +99,17 @@ export const parseAuthSession = (value: string | undefined | null): AuthSession 
 };
 
 export const serializeAuthSession = (session: AuthSession): string => {
-    return JSON.stringify(session);
+    // Keep cookie payload compact so browsers do not drop oversized cookies.
+    const persisted: PersistedAuthSession = {
+        loginToken: session.loginToken,
+        userTypeId: session.userTypeId,
+        isEmployer: session.isEmployer,
+        displayName: session.displayName,
+        email: session.email,
+        companyId: session.companyId,
+    };
+
+    return JSON.stringify(persisted);
 };
 
 export const getAuthSessionFromCookieValue = (
