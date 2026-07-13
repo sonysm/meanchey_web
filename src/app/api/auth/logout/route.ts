@@ -1,8 +1,8 @@
 import { AUTH_COOKIE_NAME } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(request: NextRequest) {
-    const response = NextResponse.redirect(new URL("/login", request.url));
+const buildClearedCookieResponse = () => {
+    const response = NextResponse.json({ message: "Logged out" }, { status: 200 });
 
     response.cookies.set({
         name: AUTH_COOKIE_NAME,
@@ -15,4 +15,13 @@ export async function GET(request: NextRequest) {
     });
 
     return response;
+};
+
+export async function POST() {
+    return buildClearedCookieResponse();
+}
+
+export async function GET(request: NextRequest) {
+    // Ignore accidental GETs (e.g. prefetch) to avoid clearing a valid session.
+    return NextResponse.redirect(new URL("/admin", request.url));
 }

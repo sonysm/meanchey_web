@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Newspaper,
@@ -42,14 +42,34 @@ export function AdminSidebar({
 }: {
   user?: AuthSession | null;
 }) {
+  const router = useRouter();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const visibleNavItems = user?.isEmployer
     ? navItems
     : navItems.filter((item) => item.href !== "/admin/news/create");
 
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname.startsWith(href);
+
+  const handleLogout = async () => {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } finally {
+      router.replace("/login");
+      router.refresh();
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
     <aside
@@ -129,16 +149,17 @@ export function AdminSidebar({
 
             <div className="flex items-center gap-2">
               {user ? (
-                <Link
-                  href="/api/auth/logout"
-                  className={cn(
-                    buttonVariants({ variant: "outline", size: "sm" }),
-                    "w-full justify-center gap-2",
-                  )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-center gap-2"
+                  onClick={() => void handleLogout()}
+                  disabled={isLoggingOut}
                 >
                   <LogOut size={16} />
-                  Log out
-                </Link>
+                  {isLoggingOut ? "Logging out..." : "Log out"}
+                </Button>
               ) : (
                 <Link
                   href="/login"
