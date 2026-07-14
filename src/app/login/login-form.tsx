@@ -63,20 +63,24 @@ export default function LoginForm() {
                 headers: {
                     "Content-Type": "application/json",
                 },
-                body: JSON.stringify({
-                    ...values,
-                    audience: "admin",
-                }),
+                body: JSON.stringify(values),
             });
 
-            const payload = (await response.json().catch(() => ({}))) as { message?: string };
+            const payload = (await response.json().catch(() => ({}))) as {
+                message?: string;
+                data?: {
+                    userTypeId?: number;
+                    isEmployer?: boolean;
+                };
+            };
 
             if (!response.ok) {
                 setSubmitError(payload.message ?? "Unable to sign in");
                 return;
             }
 
-            router.replace(nextPath);
+            const isAdmin = payload.data?.isEmployer === true || payload.data?.userTypeId === 1;
+            router.replace(isAdmin ? nextPath : "/");
             router.refresh();
         } finally {
             setIsSubmittingLogin(false);
