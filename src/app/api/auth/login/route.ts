@@ -74,7 +74,10 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as {
         username?: string;
         password?: string;
+        audience?: "admin" | "public";
     };
+
+    const audience = body.audience === "public" ? "public" : "admin";
 
     const username = (body.username ?? "").trim();
     const password = (body.password ?? "").trim();
@@ -161,6 +164,22 @@ export async function POST(request: NextRequest) {
         companyId,
         companies: getAuthCompanies(profileRecord),
     };
+
+    if (audience === "admin") {
+        if (userTypeId !== 1 && !isEmployer) {
+            return NextResponse.json(
+                { message: "This sign-in is for admin users only" },
+                { status: 403 },
+            );
+        }
+    } else {
+        if (userTypeId !== 2) {
+            return NextResponse.json(
+                { message: "This sign-in is for end users only" },
+                { status: 403 },
+            );
+        }
+    }
 
     const response = NextResponse.json({
         message: "Login successful",

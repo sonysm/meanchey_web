@@ -22,7 +22,7 @@ export default function PublicNavbar({ showAuthActions = true }: PublicNavbarPro
 
                 {showAuthActions ? (
                     <div className="flex items-center gap-2">
-                        <Link href="/login">
+                        <Link href="/auth/login">
                             <Button variant="outline" size="sm">Sign in</Button>
                         </Link>
                         <Link href="/signup">

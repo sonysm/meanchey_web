@@ -22,7 +22,7 @@ export default function SignupComingSoonPage() {
                                 <ArrowLeft size={16} /> Back to News
                             </Button>
                         </Link>
-                        <Link href="/login">
+                        <Link href="/auth/login">
                             <Button>Sign in</Button>
                         </Link>
                     </div>
