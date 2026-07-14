@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
     DropdownMenu,
     DropdownMenuContent,
+    DropdownMenuGroup,
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
@@ -99,25 +100,27 @@ export default function PublicNavbar({ showAuthActions = true }: PublicNavbarPro
                     <div className="flex items-center gap-2">
                         {session?.loginToken ? (
                             <DropdownMenu>
-                                <DropdownMenuTrigger>
-                                    <Button variant="outline" size="sm" className="h-9 gap-2 px-2 sm:px-3">
+                                <DropdownMenuTrigger className="inline-flex h-9 items-center gap-2 rounded-[min(var(--radius-md),12px)] border border-border bg-background px-2 text-[0.8rem] font-medium whitespace-nowrap outline-none transition-all hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:px-3">
+                                    <span className="inline-flex items-center gap-2">
                                         <Avatar size="sm">
                                             <AvatarFallback>{userInitial}</AvatarFallback>
                                         </Avatar>
                                         <span className="hidden max-w-[180px] truncate sm:inline">
                                             {session.displayName ?? session.email ?? "User"}
                                         </span>
-                                    </Button>
+                                    </span>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-64">
-                                    <DropdownMenuLabel>
-                                        <p className="truncate text-sm font-medium">
-                                            {session.displayName ?? "User"}
-                                        </p>
-                                        <p className="truncate text-xs text-muted-foreground">
-                                            {session.email ?? ""}
-                                        </p>
-                                    </DropdownMenuLabel>
+                                    <DropdownMenuGroup>
+                                        <DropdownMenuLabel>
+                                            <p className="truncate text-sm font-medium">
+                                                {session.displayName ?? "User"}
+                                            </p>
+                                            <p className="truncate text-xs text-muted-foreground">
+                                                {session.email ?? ""}
+                                            </p>
+                                        </DropdownMenuLabel>
+                                    </DropdownMenuGroup>
                                     <DropdownMenuSeparator />
                                     {isAdmin ? (
                                         <DropdownMenuItem onClick={() => router.push("/admin")}>Admin panel</DropdownMenuItem>
