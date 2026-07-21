@@ -80,6 +80,9 @@ pm2 start npm --name "meanchey-web" -- start
 #with ecosystem
 pm2 start ecosystem.config.js --env production
 
+#restart
+pm2 restart ecosystem.config.js --env production
+
 
 
 # To ensure your app restarts on server reboot
