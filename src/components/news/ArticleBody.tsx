@@ -10,6 +10,10 @@ type DetailItem = {
     imgs?: unknown;
 };
 
+type JsonParseResult =
+    | { ok: true; value: unknown }
+    | { ok: false };
+
 const isRecord = (value: unknown): value is Record<string, unknown> => {
     return typeof value === "object" && value !== null;
 };
@@ -27,8 +31,139 @@ const buildImageUrl = (image: string, photoPath: string | undefined, id: string)
     return `${base.replace(/\/$/, "")}/${image.replace(/^\//, "")}`;
 };
 
+const escapeControlCharsInJsonStrings = (input: string): string => {
+    let output = "";
+    let inString = false;
+    let escaped = false;
+
+    for (const char of input) {
+        if (!inString) {
+            output += char;
+            if (char === '"') {
+                inString = true;
+            }
+            continue;
+        }
+
+        if (escaped) {
+            output += char;
+            escaped = false;
+            continue;
+        }
+
+        if (char === "\\") {
+            output += char;
+            escaped = true;
+            continue;
+        }
+
+        if (char === '"') {
+            output += char;
+            inString = false;
+            continue;
+        }
+
+        if (char === "\n") {
+            output += "\\n";
+            continue;
+        }
+
+        if (char === "\r") {
+            output += "\\r";
+            continue;
+        }
+
+        if (char === "\t") {
+            output += "\\t";
+            continue;
+        }
+
+        output += char;
+    }
+
+    return output;
+};
+
+const parseJsonWithRepair = (text: string): JsonParseResult => {
+    try {
+        return { ok: true, value: JSON.parse(text) as unknown };
+    } catch {
+        const repaired = escapeControlCharsInJsonStrings(text);
+        if (repaired === text) {
+            return { ok: false };
+        }
+
+        try {
+            return { ok: true, value: JSON.parse(repaired) as unknown };
+        } catch {
+            return { ok: false };
+        }
+    }
+};
+
+const resolveRenderablePayload = (raw: string): unknown => {
+    const parseUnknown = (value: unknown, depth: number): unknown => {
+        if (depth > 4) {
+            return value;
+        }
+
+        if (typeof value === "string") {
+            const text = value.trim();
+            if (!text) {
+                return value;
+            }
+
+            const parsed = parseJsonWithRepair(text);
+            if (!parsed.ok) {
+                return value;
+            }
+
+            return parseUnknown(parsed.value, depth + 1);
+        }
+
+        if (Array.isArray(value)) {
+            return value;
+        }
+
+        if (isRecord(value)) {
+            if (Array.isArray(value.ops)) {
+                return value;
+            }
+
+            const candidates = [
+                value.detail,
+                value.content,
+                value.body,
+                value.description,
+                value.data,
+                value.info,
+                value.result,
+            ];
+
+            for (const candidate of candidates) {
+                const parsed = parseUnknown(candidate, depth + 1);
+                if (Array.isArray(parsed)) {
+                    return parsed;
+                }
+                if (isRecord(parsed) && Array.isArray(parsed.ops)) {
+                    return parsed;
+                }
+            }
+        }
+
+        return value;
+    };
+
+    return parseUnknown(raw, 0);
+};
+
 const parseDetailText = (value: unknown): { text: string; attributes?: Record<string, unknown> } => {
     if (typeof value === "string") {
+        const parsed = parseJsonWithRepair(value.trim());
+        if (parsed.ok) {
+            return parseDetailText(parsed.value);
+        }
+
         return { text: value };
     }
 
@@ -119,47 +254,42 @@ const renderContentBlocks = (raw: string, photoPath: string | undefined, id: str
         );
     };
 
-    try {
-        const parsed = JSON.parse(raw) as unknown;
+    const parsed = resolveRenderablePayload(raw);
 
-        if (Array.isArray(parsed)) {
-            for (const item of parsed as DetailItem[]) {
-                const imgs = Array.isArray(item?.imgs)
-                    ? item.imgs.filter((img): img is string => typeof img === "string" && img.trim().length > 0)
-                    : [];
+    if (Array.isArray(parsed)) {
+        for (const item of parsed as DetailItem[]) {
+            const imgs = Array.isArray(item?.imgs)
+                ? item.imgs.filter((img): img is string => typeof img === "string" && img.trim().length > 0)
+                : [];
 
-                for (const image of imgs) {
-                    pushImageBlock(image);
-                }
-
-                const parsedText = parseDetailText(item?.text);
-                pushTextBlock(parsedText.text, parsedText.attributes);
+            for (const image of imgs) {
+                pushImageBlock(image);
             }
 
-            return blocks;
+            const parsedText = parseDetailText(item?.text);
+            pushTextBlock(parsedText.text, parsedText.attributes);
         }
 
-        if (isRecord(parsed) && Array.isArray(parsed.ops)) {
-            for (const op of parsed.ops as DeltaOp[]) {
-                if (typeof op.insert === "string") {
-                    pushTextBlock(op.insert, isRecord(op.attributes) ? op.attributes : undefined);
-                    continue;
-                }
-
-                if (isRecord(op.insert) && typeof op.insert.image === "string") {
-                    pushImageBlock(op.insert.image);
-                }
-            }
-
-            return blocks;
-        }
-
-        pushTextBlock(raw);
-        return blocks;
-    } catch {
-        pushTextBlock(raw);
         return blocks;
     }
+
+    if (isRecord(parsed) && Array.isArray(parsed.ops)) {
+        for (const op of parsed.ops as DeltaOp[]) {
+            if (typeof op.insert === "string") {
+                pushTextBlock(op.insert, isRecord(op.attributes) ? op.attributes : undefined);
+                continue;
+            }
+
+            if (isRecord(op.insert) && typeof op.insert.image === "string") {
+                pushImageBlock(op.insert.image);
+            }
+        }
+
+        return blocks;
+    }
+
+    pushTextBlock(raw);
+    return blocks;
 };
 
 type ArticleBodyProps = {

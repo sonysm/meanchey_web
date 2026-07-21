@@ -51,15 +51,6 @@ export default async function PublicNewsDetailPage({
                         </div>
                     </header>
 
-                    {article.coverImage ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                            src={article.coverImage}
-                            alt={article.title}
-                            className="h-auto w-full rounded-2xl border border-border object-cover"
-                        />
-                    ) : null}
-
                     <section className="rounded-2xl border border-border bg-card p-4 sm:p-6">
                         <ArticleBody
                             content={article.content}

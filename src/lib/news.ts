@@ -132,7 +132,7 @@ const resolveCoverImage = (
   const photoBase = (photoPath && photoPath.trim().length > 0)
     ? photoPath
     : buildDefaultPhotoBase(id);
-  console.debug("news.resolveCoverImage: inputs", { explicitCover, photoPath, id, contentAny });
+  //console.debug("news.resolveCoverImage: inputs", { explicitCover, photoPath, id, contentAny });
 
   if (explicitCover && explicitCover.trim().length > 0) {
     const resolved = toAbsoluteImageUrl(explicitCover, photoBase);
