@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -11,16 +11,51 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import QuillEditor from "@/components/admin/QuillEditor";
 import TagInput from "@/components/admin/tag-input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
+import type { AuthCompany, AuthSession } from "@/lib/auth";
 
 const newsSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
   content: z.string().min(2, "Content is required"),
   tags: z.array(z.string()),
+  companyId: z.string().min(1, "Host company is required"),
 });
 
 type NewsFormValues = z.infer<typeof newsSchema>;
+
+const parsePossibleTagValue = (val: unknown): string[] | undefined => {
+  if (Array.isArray(val)) {
+    return val.filter((t): t is string => typeof t === "string");
+  }
+  if (typeof val === "string") {
+    const text = val.trim();
+    if (!text) return undefined;
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((t): t is string => typeof t === "string")
+          .map((t) => t.trim())
+          .filter(Boolean);
+      }
+    } catch {
+      // not JSON
+    }
+    return text
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  }
+  return undefined;
+};
 
 export default function EditNewsPage({
   params,
@@ -32,16 +67,20 @@ export default function EditNewsPage({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isLoadingArticle, setIsLoadingArticle] = useState(true);
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [imageBaseUrl, setImageBaseUrl] = useState<string>(
     `https://meanchey.org/storage/article/${id}`,
   );
   const [imageUploadState, setImageUploadState] = useState({ uploading: 0, failed: 0 });
+  const [session, setSession] = useState<AuthSession | null>(null);
 
   const {
     register,
     handleSubmit,
     control,
     reset,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<NewsFormValues>({
     resolver: zodResolver(newsSchema),
@@ -49,38 +88,67 @@ export default function EditNewsPage({
       title: "",
       content: JSON.stringify({ ops: [{ insert: "\n" }] }),
       tags: [],
+      companyId: "",
     },
   });
 
+  const companyIdValue = watch("companyId");
+  const companies = useMemo<AuthCompany[]>(() => session?.companies ?? [], [session]);
+
   useEffect(() => {
-    const loadArticle = async () => {
+    const loadData = async () => {
       setIsLoadingArticle(true);
+      setIsLoadingSession(true);
       setLoadError(null);
 
       try {
-        const response = await fetch(`/api/admin/articles/${id}`, {
-          credentials: "include",
-        });
-        if (!response.ok) {
+        const [articleResponse, sessionResponse] = await Promise.all([
+          fetch(`/api/admin/articles/${id}`, {
+            credentials: "include",
+          }),
+          fetch("/api/auth/session", {
+            credentials: "include",
+          }),
+        ]);
+
+        if (!articleResponse.ok) {
           throw new Error("Failed to load article");
         }
 
-        const payload = (await response.json()) as {
+        const articlePayload = (await articleResponse.json()) as {
           data?: {
             title?: string;
             content?: string;
             photoPath?: string;
             tags?: string[];
             tag?: string | string[];
+            companyId?: string;
           };
         };
 
-        const article = payload.data;
+        const article = articlePayload.data;
         if (!article) {
           throw new Error("Article not found");
         }
 
         setImageBaseUrl(article.photoPath ?? `https://meanchey.org/storage/article/${id}`);
+
+        let nextSession: AuthSession | null = null;
+        if (sessionResponse.ok) {
+          const sessionPayload = (await sessionResponse.json().catch(() => ({}))) as {
+            data?: AuthSession | null;
+          };
+          nextSession = sessionPayload.data ?? null;
+          setSession(nextSession);
+        } else {
+          setSession(null);
+        }
+
+        const defaultCompanyId =
+          article.companyId ??
+          nextSession?.companyId?.toString() ??
+          nextSession?.companies?.[0]?.id.toString() ??
+          "";
 
         reset({
           title: article.title ?? "",
@@ -88,39 +156,25 @@ export default function EditNewsPage({
             article.content && article.content.trim().length > 0
               ? article.content
               : JSON.stringify({ ops: [{ insert: "\n" }] }),
-          tags: (() => {
-            const parsePossibleTagValue = (val: unknown): string[] | undefined => {
-              if (Array.isArray(val)) {
-                return val.filter((t): t is string => typeof t === "string");
-              }
-              if (typeof val === "string") {
-                const text = val.trim();
-                if (!text) return undefined;
-                try {
-                  const parsed = JSON.parse(text);
-                  if (Array.isArray(parsed)) {
-                    return parsed.filter((t): t is string => typeof t === "string").map((t) => t.trim()).filter(Boolean);
-                  }
-                } catch {
-                  // not JSON
-                }
-                return text.split(",").map((tag) => tag.trim()).filter(Boolean);
-              }
-              return undefined;
-            };
-
-            return parsePossibleTagValue(article.tags) ?? parsePossibleTagValue(article.tag) ?? [];
-          })(),
+          tags: parsePossibleTagValue(article.tags) ?? parsePossibleTagValue(article.tag) ?? [],
+          companyId: defaultCompanyId,
         });
       } catch (error) {
         setLoadError(error instanceof Error ? error.message : "Failed to load article");
       } finally {
         setIsLoadingArticle(false);
+        setIsLoadingSession(false);
       }
     };
 
-    void loadArticle();
+    void loadData();
   }, [id, reset]);
+
+  useEffect(() => {
+    if (!companyIdValue && companies.length === 1) {
+      setValue("companyId", companies[0]?.id.toString() ?? "", { shouldValidate: true });
+    }
+  }, [companies, companyIdValue, setValue]);
 
   const onSubmit = async (data: NewsFormValues) => {
     if (imageUploadState.uploading > 0 || imageUploadState.failed > 0) {
@@ -217,6 +271,34 @@ export default function EditNewsPage({
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
+              <Label>Host Company *</Label>
+              <Select
+                value={companyIdValue}
+                onValueChange={(v) => setValue("companyId", v ?? "", { shouldValidate: true })}
+                disabled={isLoadingSession || companies.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={isLoadingSession ? "Loading companies..." : "Select host company"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id.toString()}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.companyId && (
+                <p className="text-xs text-destructive">{errors.companyId.message}</p>
+              )}
+              {!isLoadingSession && companies.length === 0 && !loadError && (
+                <p className="text-xs text-muted-foreground">
+                  No company is linked to this account.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
               <Label>Tags</Label>
               <Controller
                 control={control}
@@ -230,7 +312,6 @@ export default function EditNewsPage({
                 )}
               />
             </div>
-
           </CardContent>
         </Card>
 
@@ -240,6 +321,8 @@ export default function EditNewsPage({
             disabled={
               isSubmitting ||
               isLoadingArticle ||
+              isLoadingSession ||
+              companies.length === 0 ||
               imageUploadState.uploading > 0 ||
               imageUploadState.failed > 0
             }

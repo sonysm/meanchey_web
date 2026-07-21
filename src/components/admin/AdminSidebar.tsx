@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  Home,
   LayoutDashboard,
   Newspaper,
   PlusCircle,
@@ -19,6 +20,12 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { AuthSession } from "@/lib/auth";
 
 const navItems = [
+  {
+    label: "Front Page",
+    href: "/",
+    icon: Home,
+    exact: true,
+  },
   {
     label: "Dashboard",
     href: "/admin",

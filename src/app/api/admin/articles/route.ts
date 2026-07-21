@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import {
     AUTH_COOKIE_NAME,
     getAuthCompanies,
@@ -513,6 +514,11 @@ export async function POST(request: NextRequest) {
             { status: response.status },
         );
     }
+
+    revalidatePath("/admin");
+    revalidatePath("/admin/news");
+    revalidatePath("/");
+    revalidatePath("/search");
 
     return NextResponse.json({ message: "Article created", data });
 }

@@ -121,7 +121,8 @@ export default function CreateNewsPage() {
       return;
     }
 
-    router.push("/admin/news");
+    router.replace("/admin/news");
+    router.refresh();
   };
 
   return (

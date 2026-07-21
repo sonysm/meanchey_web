@@ -8,6 +8,14 @@ const nextConfig: NextConfig = {
         hostname: "api-mb.meanchey.org",
       },
       {
+        protocol: "http",
+        hostname: "dev.kramajobs.com",
+      },
+      {
+        protocol: "https",
+        hostname: "dev.kramajobs.com",
+      },
+      {
         protocol: "https",
         hostname: "meanchey.org",
       },

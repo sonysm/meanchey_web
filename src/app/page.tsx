@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { Flame, Search } from "lucide-react";
+import { Flame } from "lucide-react";
 
 import { getNews } from "@/lib/news";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import PublicNewsFeed from "@/components/news/PublicNewsFeed";
 import PublicNavbar from "@/components/news/PublicNavbar";
+import PublicNewsSearch from "@/components/news/PublicNewsSearch";
 
 const getCategoryChips = (tags: string[][]): string[] => {
   const seen = new Set<string>();
@@ -79,13 +79,7 @@ export default async function Home() {
           )}
 
           <aside className="space-y-4">
-            <div className="rounded-2xl border border-border bg-card p-4">
-              <p className="mb-3 text-sm font-medium">Find news</p>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input disabled placeholder="Search (coming soon)" className="pl-9" />
-              </div>
-            </div>
+            <PublicNewsSearch />
 
             <div className="rounded-2xl border border-border bg-card p-4">
               <p className="mb-3 text-sm font-medium">Categories</p>

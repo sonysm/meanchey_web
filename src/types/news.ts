@@ -20,6 +20,7 @@ export interface News {
   status: NewsStatus;
   authorId: string;
   authorName: string;
+  companyId?: string;
   companyName?: string;
   publishedAt?: string;
   createdAt: string;

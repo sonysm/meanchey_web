@@ -1,6 +1,8 @@
 import { getNewsById } from "@/lib/news";
 import {
     AUTH_COOKIE_NAME,
+    getAuthCompanies,
+    getCompanyId,
     getAuthSessionFromCookieValue,
     getFirstRecord,
     getNumberValue,
@@ -16,6 +18,15 @@ const API_BASE_URL = process.env.MEANCHEY_API_BASE_URL;
 
 type DeltaOperation = { insert?: unknown; attributes?: Record<string, unknown> };
 type DeltaPayload = { ops?: DeltaOperation[] };
+type DetailItem = {
+    vdo?: unknown;
+    audio?: unknown;
+    file?: unknown;
+    title?: unknown;
+    text?: unknown;
+    imgs?: unknown;
+    order_no?: unknown;
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
     return typeof value === "object" && value !== null;
@@ -45,6 +56,200 @@ const extractImageName = (rawImage: unknown): string | null => {
     }
 
     return rawImage;
+};
+
+const DATA_URL_PATTERN = /^data:([a-zA-Z0-9/+.-]+);base64,(.+)$/;
+
+const isDataUrl = (value: string): boolean => {
+    return DATA_URL_PATTERN.test(value);
+};
+
+const dataUrlToBlob = (dataUrl: string): { blob: Blob; extension: string } | null => {
+    const match = dataUrl.match(DATA_URL_PATTERN);
+    if (!match) {
+        return null;
+    }
+
+    const mimeType = match[1] ?? "application/octet-stream";
+    const base64Payload = match[2] ?? "";
+
+    try {
+        const binary = Buffer.from(base64Payload, "base64");
+        const slashIndex = mimeType.indexOf("/");
+        const subtype = slashIndex >= 0 ? mimeType.slice(slashIndex + 1) : "bin";
+        const extension = subtype.split("+")[0] || "bin";
+        const blob = new Blob([binary], { type: mimeType });
+
+        return { blob, extension };
+    } catch {
+        return null;
+    }
+};
+
+const normalizeDetailPayload = (detail: unknown): DetailItem[] => {
+    if (!Array.isArray(detail)) {
+        return [{ order_no: 0, text: { insert: "" }, imgs: [], audio: "", vdo: "", file: null, title: null }];
+    }
+
+    return detail.map((item, index) => {
+        const source = isRecord(item) ? item : {};
+        const sourceImgs = Array.isArray(source.imgs)
+            ? source.imgs
+                .map((img) => extractImageName(img))
+                .filter((img): img is string => Boolean(img))
+            : [];
+
+        return {
+            vdo: source.vdo ?? "",
+            audio: source.audio ?? "",
+            file: source.file ?? null,
+            title: source.title ?? null,
+            text: source.text ?? { insert: "" },
+            imgs: sourceImgs,
+            order_no: Number(source.order_no ?? index),
+        };
+    });
+};
+
+const extractUploadedImages = (value: unknown): string[] => {
+    if (typeof value === "string" && value.trim().length > 0) {
+        return [value.trim()];
+    }
+
+    if (Array.isArray(value)) {
+        return value
+            .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+            .map((item) => item.trim());
+    }
+
+    if (!isRecord(value)) {
+        return [];
+    }
+
+    const candidates = [
+        value.imgs,
+        value.images,
+        value.files,
+        value.data,
+        value.info,
+        value.result,
+    ];
+
+    for (const candidate of candidates) {
+        const found = extractUploadedImages(candidate);
+        if (found.length > 0) {
+            return found;
+        }
+    }
+
+    const singles = [value.img, value.image, value.file, value.filename, value.file_name, value.name];
+    for (const candidate of singles) {
+        if (typeof candidate === "string" && candidate.trim().length > 0) {
+            return [candidate.trim()];
+        }
+    }
+
+    return [];
+};
+
+const uploadArticleImages = async (
+    apiBaseUrl: string,
+    loginToken: string,
+    imageDataUrls: string[],
+): Promise<string[]> => {
+    if (imageDataUrls.length === 0) {
+        return [];
+    }
+
+    const formData = new FormData();
+    formData.append("login_token", loginToken);
+    formData.append("access_token", loginToken);
+    formData.append("country_code", "kh");
+
+    for (let index = 0; index < imageDataUrls.length; index += 1) {
+        const dataUrl = imageDataUrls[index];
+        const encoded = dataUrlToBlob(dataUrl);
+
+        if (!encoded) {
+            throw new Error("Invalid embedded image format");
+        }
+
+        formData.append("imgs[]", encoded.blob, `image-${index}.${encoded.extension || "jpg"}`);
+    }
+
+    const uploadUrl = new URL("/article-imgs/upload", apiBaseUrl);
+    const response = await fetch(uploadUrl.toString(), {
+        method: "POST",
+        body: formData,
+    });
+
+    const raw = await response.text();
+    let data: unknown = null;
+    try {
+        data = raw ? (JSON.parse(raw) as unknown) : null;
+    } catch {
+        data = raw;
+    }
+
+    if (!response.ok) {
+        throw new Error(extractMessage(data, `Failed to upload article images (${response.status})`));
+    }
+
+    const uploaded = extractUploadedImages(data);
+    if (uploaded.length !== imageDataUrls.length) {
+        throw new Error("Article image upload returned incomplete file list");
+    }
+
+    return uploaded;
+};
+
+const resolveDetailWithUploadedImages = async (
+    apiBaseUrl: string,
+    loginToken: string,
+    detail: unknown,
+): Promise<DetailItem[]> => {
+    const normalized = normalizeDetailPayload(detail);
+
+    const imageDataUrls: string[] = [];
+    for (const item of normalized) {
+        const imgs = Array.isArray(item.imgs)
+            ? item.imgs.filter((img): img is string => typeof img === "string")
+            : [];
+
+        for (const image of imgs) {
+            if (isDataUrl(image)) {
+                imageDataUrls.push(image);
+            }
+        }
+    }
+
+    if (imageDataUrls.length === 0) {
+        return normalized;
+    }
+
+    const uploadedFileNames = await uploadArticleImages(apiBaseUrl, loginToken, imageDataUrls);
+    let uploadIndex = 0;
+
+    return normalized.map((item) => {
+        const imgs = Array.isArray(item.imgs)
+            ? item.imgs.filter((img): img is string => typeof img === "string")
+            : [];
+
+        const nextImgs = imgs.map((img) => {
+            if (!isDataUrl(img)) {
+                return img;
+            }
+
+            const uploadedName = uploadedFileNames[uploadIndex];
+            uploadIndex += 1;
+            return uploadedName;
+        });
+
+        return {
+            ...item,
+            imgs: nextImgs,
+        };
+    });
 };
 
 const getStringField = (value: unknown): string | null => {
@@ -232,6 +437,99 @@ const resolveSessionUserId = async (
     }
 };
 
+const resolveSessionCompanyId = async (
+    loginToken: string,
+    existingCompanyId?: number,
+): Promise<number | undefined> => {
+    if (existingCompanyId && existingCompanyId > 0) {
+        return existingCompanyId;
+    }
+
+    if (!API_BASE_URL) {
+        return undefined;
+    }
+
+    try {
+        const profileResponse = await fetch(new URL("/profile", API_BASE_URL), {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ login_token: loginToken }),
+            cache: "no-store",
+        });
+
+        if (!profileResponse.ok) {
+            return undefined;
+        }
+
+        const profileData = await readJson(profileResponse);
+        const profileRecord = getFirstRecord(profileData);
+        if (!profileRecord) {
+            return undefined;
+        }
+
+        const companyId = getCompanyId(profileRecord);
+        if (companyId > 0) {
+            return companyId;
+        }
+
+        const companies = getAuthCompanies(profileRecord);
+        return companies.length > 0 ? companies[0]?.id : undefined;
+    } catch {
+        return undefined;
+    }
+};
+
+const loadAllowedCompanyIds = async (
+    loginToken: string,
+    cookieCompanyIds: number[],
+): Promise<Set<number>> => {
+    const allowedCompanyIds = new Set(
+        cookieCompanyIds
+            .map((companyId) => Number(companyId))
+            .filter((companyId) => Number.isFinite(companyId) && companyId > 0),
+    );
+
+    if (allowedCompanyIds.size > 0 || !API_BASE_URL) {
+        return allowedCompanyIds;
+    }
+
+    try {
+        const profileResponse = await fetch(new URL("/profile", API_BASE_URL), {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ login_token: loginToken }),
+            cache: "no-store",
+        });
+
+        if (!profileResponse.ok) {
+            return allowedCompanyIds;
+        }
+
+        const profileData = await readJson(profileResponse);
+        const profileRecord = getFirstRecord(profileData);
+        if (!profileRecord) {
+            return allowedCompanyIds;
+        }
+
+        for (const company of getAuthCompanies(profileRecord)) {
+            allowedCompanyIds.add(company.id);
+        }
+
+        const fallbackCompanyId = getCompanyId(profileRecord);
+        if (fallbackCompanyId > 0) {
+            allowedCompanyIds.add(fallbackCompanyId);
+        }
+    } catch {
+        return allowedCompanyIds;
+    }
+
+    return allowedCompanyIds;
+};
+
 export async function GET(request: NextRequest, context: RouteContext) {
     const session = getAuthSessionFromCookieValue(request.cookies.get(AUTH_COOKIE_NAME)?.value);
     if (!session?.isEmployer || !session.loginToken) {
@@ -276,12 +574,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const session = getAuthSessionFromCookieValue(request.cookies.get(AUTH_COOKIE_NAME)?.value);
 
-    if (!session?.isEmployer || !session.loginToken || !session.companyId) {
+    if (!session?.isEmployer || !session.loginToken) {
         return NextResponse.json(
             { message: "Employer login is required" },
             { status: 401 },
         );
     }
+
+    const sessionCompanyId = await resolveSessionCompanyId(session.loginToken, session.companyId);
 
     const sessionUserId = await resolveSessionUserId(session.loginToken, session.userId);
     if (!sessionUserId) {
@@ -296,6 +596,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         title?: string;
         content?: string;
         tags?: string | string[];
+        companyId?: string;
     };
 
     const title = (body.title ?? "").trim();
@@ -315,11 +616,45 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         );
     }
 
+    const allowedCompanyIds = await loadAllowedCompanyIds(
+        session.loginToken,
+        (session.companies ?? []).map((company) => company.id),
+    );
+
+    const selectedCompanyId = Number(body.companyId ?? 0);
+    let payloadCompanyId: number | undefined;
+
+    if (selectedCompanyId > 0) {
+        if (allowedCompanyIds.size > 0 && !allowedCompanyIds.has(selectedCompanyId)) {
+            return NextResponse.json(
+                { message: "Selected host company is not linked to this account" },
+                { status: 403 },
+            );
+        }
+        payloadCompanyId = selectedCompanyId;
+    } else if (sessionCompanyId && sessionCompanyId > 0) {
+        payloadCompanyId = sessionCompanyId;
+    } else if (allowedCompanyIds.size > 0) {
+        payloadCompanyId = Array.from(allowedCompanyIds)[0];
+    }
+
+    let detailPayload: DetailItem[];
+    try {
+        detailPayload = await resolveDetailWithUploadedImages(
+            API_BASE_URL,
+            session.loginToken,
+            toDetailPayload(body.content ?? ""),
+        );
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to process article images";
+        return NextResponse.json({ message }, { status: 400 });
+    }
+
     const payload = {
         id: Number(id) || id,
-        cid: session.companyId,
+        ...(payloadCompanyId ? { cid: payloadCompanyId } : {}),
         title,
-        detail: toDetailPayload(body.content ?? ""),
+        detail: detailPayload,
         tag: toTagPayload(body.tags),
         login_token: session.loginToken,
     };
@@ -347,6 +682,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
             { status: response.status },
         );
     }
+
+    revalidatePath("/admin");
+    revalidatePath("/admin/news");
+    revalidatePath("/");
+    revalidatePath("/search");
 
     return NextResponse.json({ message: "Article updated", data });
 }
@@ -437,6 +777,8 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
             if (response.ok) {
                 revalidatePath("/admin");
                 revalidatePath("/admin/news");
+                revalidatePath("/");
+                revalidatePath("/search");
                 return NextResponse.json({ message: "Article deleted", data });
             }
 

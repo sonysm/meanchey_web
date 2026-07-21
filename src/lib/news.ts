@@ -13,7 +13,7 @@ const postApi = async (path: string, body: Record<string, unknown>) => {
   const url = new URL(path, API_BASE_URL);
   const response = await fetch(url.toString(), {
     method: "POST",
-    next: { revalidate: 30 },
+    next: { revalidate: 30, tags: ["news:list"] },
     headers: API_DEFAULT_HEADERS,
     body: JSON.stringify(body),
   });
@@ -256,6 +256,15 @@ const mapApiNewsItem = (item: Record<string, unknown>): News => {
     status: normalizeNewsStatus(statusRaw),
     authorId: String(item.authorId ?? item.user_id ?? item.author_id ?? ""),
     authorName: String(item.authorName ?? item.author ?? item.user_name ?? ""),
+    companyId:
+      (() => {
+        const raw = item.companyId ?? item.company_id ?? item.cid ?? item.comp_id;
+        if (raw === undefined || raw === null) {
+          return undefined;
+        }
+        const parsed = String(raw).trim();
+        return parsed.length > 0 ? parsed : undefined;
+      })(),
     companyName:
       typeof item.companyName === "string"
         ? item.companyName
@@ -394,6 +403,48 @@ export const getNewsById = async (id: string): Promise<News | null> => {
     return mapApiNewsItem(item);
   } catch {
     return null;
+  }
+};
+
+export const searchNews = async (
+  text: string,
+  limit = 20,
+  offset = 0,
+  countryCode = "kh",
+): Promise<{ data: News[]; hasMore: boolean; nextOffset: number }> => {
+  if (!API_BASE_URL) {
+    return { data: [], hasMore: false, nextOffset: offset };
+  }
+
+  const normalizedText = text.trim();
+  if (!normalizedText) {
+    return { data: [], hasMore: false, nextOffset: offset };
+  }
+
+  try {
+    // Fetch one extra item so the client can paginate reliably.
+    const payload = await postApi("/article/search", {
+      country_code: countryCode,
+      text: normalizedText,
+      limit: limit + 1,
+      offset,
+    });
+
+    if (!payload) {
+      return { data: [], hasMore: false, nextOffset: offset };
+    }
+
+    const items = extractNewsArray(payload).map(mapApiNewsItem);
+    const hasMore = items.length > limit;
+    const data = hasMore ? items.slice(0, limit) : items;
+
+    return {
+      data,
+      hasMore,
+      nextOffset: offset + data.length,
+    };
+  } catch {
+    return { data: [], hasMore: false, nextOffset: offset };
   }
 };
 

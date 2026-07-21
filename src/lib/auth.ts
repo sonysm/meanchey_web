@@ -202,10 +202,16 @@ export const getCompanyId = (profile: Record<string, unknown>): number => {
             continue;
         }
 
-        const companyId = getNumberValue(record, ["id", "company_id", "cid"]);
+        const companyId = getNumberValue(record, ["id", "company_id", "companyId", "companyid", "cid", "comp_id"]);
         if (companyId > 0) {
             return companyId;
         }
+    }
+
+    // Some profile payloads expose company id at root instead of company lists.
+    const rootCompanyId = getNumberValue(profile, ["company_id", "companyId", "companyid", "cid", "comp_id"]);
+    if (rootCompanyId > 0) {
+        return rootCompanyId;
     }
 
     return 0;
@@ -230,7 +236,7 @@ const parseCompanyList = (value: unknown): AuthCompany[] => {
                 return null;
             }
 
-            const id = getNumberValue(item, ["id", "company_id", "cid"]);
+            const id = getNumberValue(item, ["id", "company_id", "companyId", "companyid", "cid", "comp_id"]);
             const name = getStringValue(item, ["name", "title", "company_name", "display_name"]);
 
             if (id <= 0 || !name) {

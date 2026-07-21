@@ -24,9 +24,11 @@ type PersistedFeedState = {
     offset: number;
     hasMore: boolean;
     scrollY: number;
+    savedAt: number;
 };
 
 const FEED_STATE_KEY = "meanchey-public-feed-state-v1";
+const FEED_STATE_TTL_MS = 1000 * 60 * 5;
 
 const readPersistedState = (): PersistedFeedState | null => {
     if (typeof window === "undefined") {
@@ -44,11 +46,18 @@ const readPersistedState = (): PersistedFeedState | null => {
             return null;
         }
 
+        const savedAt = typeof parsed.savedAt === "number" ? parsed.savedAt : 0;
+        if (!savedAt || Date.now() - savedAt > FEED_STATE_TTL_MS) {
+            window.sessionStorage.removeItem(FEED_STATE_KEY);
+            return null;
+        }
+
         return {
             items: parsed.items,
             offset: typeof parsed.offset === "number" ? parsed.offset : parsed.items.length,
             hasMore: typeof parsed.hasMore === "boolean" ? parsed.hasMore : true,
             scrollY: typeof parsed.scrollY === "number" ? parsed.scrollY : 0,
+            savedAt,
         };
     } catch {
         return null;
@@ -117,6 +126,7 @@ export default function PublicNewsFeed({
             offset: nextOffset,
             hasMore: nextHasMore,
             scrollY: window.scrollY,
+            savedAt: Date.now(),
         });
     };
 
