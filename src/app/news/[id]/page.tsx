@@ -8,14 +8,6 @@ import ArticleBody from "@/components/news/ArticleBody";
 import { Button } from "@/components/ui/button";
 import PublicNavbar from "@/components/news/PublicNavbar";
 
-const buildMetaDescription = (text: string | undefined): string => {
-    if (!text) {
-        return "Read the latest updates from Meanchey News.";
-    }
-
-    return text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 180);
-};
-
 const normalizeIsoDate = (value: string | undefined): string | undefined => {
     if (!value) {
         return undefined;
@@ -40,12 +32,10 @@ export async function generateMetadata({
     if (!article) {
         return {
             title: "Article Not Found | Meanchey News",
-            description: "The requested article is not available.",
         };
     }
 
     const title = `${article.title} | Meanchey News`;
-    const description = buildMetaDescription(article.excerpt || article.content);
     const url = `/news/${article.id}`;
     const imageUrl = article.coverImage || "/meanchey-logo.svg";
     const publishedTime = normalizeIsoDate(article.publishedAt || article.createdAt);
@@ -54,14 +44,12 @@ export async function generateMetadata({
 
     return {
         title,
-        description,
         authors: [{ name: author }],
         alternates: {
             canonical: url,
         },
         openGraph: {
             title,
-            description,
             url,
             type: "article",
             siteName: "Meanchey News",
@@ -79,7 +67,6 @@ export async function generateMetadata({
         twitter: {
             card: "summary_large_image",
             title,
-            description,
             images: [imageUrl],
         },
     };
@@ -101,13 +88,11 @@ export default async function PublicNewsDetailPage({
     const publishIso = normalizeIsoDate(article.publishedAt || article.createdAt);
     const modifiedIso = normalizeIsoDate(article.updatedAt);
     const articleAuthor = (article.companyName ?? article.authorName)?.trim() || "Meanchey News";
-    const articleDescription = buildMetaDescription(article.excerpt || article.content);
     const schemaImage = article.coverImage || `${process.env.NEXT_PUBLIC_SITE_URL || "https://meanchey.org"}/meanchey-logo.svg`;
     const articleSchema = {
         "@context": "https://schema.org",
         "@type": "NewsArticle",
         headline: article.title,
-        description: articleDescription,
         image: [schemaImage],
         datePublished: publishIso,
         dateModified: modifiedIso || publishIso,
