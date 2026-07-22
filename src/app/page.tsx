@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Flame } from "lucide-react";
 
 import { getNews } from "@/lib/news";
-import { Button } from "@/components/ui/button";
 import PublicNewsFeed from "@/components/news/PublicNewsFeed";
 import PublicNavbar from "@/components/news/PublicNavbar";
 import PublicNewsSearch from "@/components/news/PublicNewsSearch";
@@ -47,7 +46,10 @@ export default async function Home() {
       <main className="mx-auto w-full max-w-6xl space-y-8 px-4 py-8 sm:px-6 lg:py-10">
         <section className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
           {featured ? (
-            <article className="overflow-hidden rounded-2xl border border-border bg-card">
+            <Link
+              href={`/news/${featured.id}`}
+              className="group block overflow-hidden rounded-2xl border border-border bg-card transition-transform duration-200 hover:-translate-y-1 hover:shadow-md"
+            >
               {featured.coverImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -58,7 +60,9 @@ export default async function Home() {
               ) : null}
               <div className="space-y-3 p-5 sm:p-6">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Top Story</p>
-                <h1 className="text-2xl font-semibold leading-tight sm:text-3xl">{featured.title}</h1>
+                <h1 className="text-2xl font-semibold leading-tight transition-colors group-hover:text-primary sm:text-3xl">
+                  {featured.title}
+                </h1>
                 <p className="line-clamp-3 text-sm text-muted-foreground">
                   {featured.excerpt || "Read the latest update from Meanchey News."}
                 </p>
@@ -66,12 +70,12 @@ export default async function Home() {
                   <span className="text-xs text-muted-foreground">
                     {new Date(featured.createdAt).toLocaleDateString()} • {(featured.companyName ?? featured.authorName) || "Meanchey"}
                   </span>
-                  <Link href={`/news/${featured.id}`}>
-                    <Button size="sm">Read article</Button>
-                  </Link>
+                  <span className="text-xs font-medium text-muted-foreground transition-colors group-hover:text-primary">
+                    Open detail
+                  </span>
                 </div>
               </div>
-            </article>
+            </Link>
           ) : (
             <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center text-muted-foreground">
               No featured article available.
@@ -98,9 +102,27 @@ export default async function Home() {
               <p className="mb-3 flex items-center gap-2 text-sm font-medium"><Flame className="h-4 w-4" /> Trending</p>
               <div className="space-y-3">
                 {trending.length > 0 ? trending.map((item) => (
-                  <Link key={item.id} href={`/news/${item.id}`} className="block rounded-lg p-2 hover:bg-muted/50">
-                    <p className="line-clamp-2 text-sm font-medium">{item.title}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleDateString()}</p>
+                  <Link
+                    key={item.id}
+                    href={`/news/${item.id}`}
+                    className="group block rounded-lg p-2 transition-transform duration-200 hover:-translate-y-0.5 hover:bg-muted/50"
+                  >
+                    <div className="flex items-start gap-3">
+                      {item.coverImage ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.coverImage}
+                          alt={item.title}
+                          className="h-12 w-16 shrink-0 rounded-md border border-border object-cover"
+                        />
+                      ) : (
+                        <div className="h-12 w-16 shrink-0 rounded-md border border-dashed border-border bg-muted" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="line-clamp-2 text-sm font-medium transition-colors group-hover:text-primary">{item.title}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    </div>
                   </Link>
                 )) : (
                   <p className="text-xs text-muted-foreground">No trending articles.</p>

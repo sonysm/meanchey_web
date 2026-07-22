@@ -74,7 +74,11 @@ const writePersistedState = (state: PersistedFeedState): void => {
 
 const NewsCard = ({ item, onBeforeOpen }: { item: News; onBeforeOpen: () => void }) => {
     return (
-        <article className="overflow-hidden rounded-2xl border border-border bg-card">
+        <Link
+            href={`/news/${item.id}`}
+            onClick={onBeforeOpen}
+            className="group block overflow-hidden rounded-2xl border border-border bg-card transition-transform duration-200 hover:-translate-y-1 hover:shadow-md"
+        >
             {item.coverImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -86,7 +90,7 @@ const NewsCard = ({ item, onBeforeOpen }: { item: News; onBeforeOpen: () => void
                 <div className="h-44 w-full bg-muted" />
             )}
             <div className="space-y-2 p-4">
-                <h3 className="line-clamp-2 text-base font-medium">{item.title}</h3>
+                <h3 className="line-clamp-2 text-base font-medium transition-colors group-hover:text-primary">{item.title}</h3>
                 <p className="line-clamp-2 text-sm text-muted-foreground">
                     {item.excerpt || "Open article to read the full story."}
                 </p>
@@ -96,11 +100,8 @@ const NewsCard = ({ item, onBeforeOpen }: { item: News; onBeforeOpen: () => void
                         <Eye className="h-3.5 w-3.5" /> {item.viewCount?.toLocaleString() ?? 0}
                     </span>
                 </div>
-                <Link href={`/news/${item.id}`} onClick={onBeforeOpen}>
-                    <Button variant="outline" size="sm" className="mt-1 w-full">Read more</Button>
-                </Link>
             </div>
-        </article>
+        </Link>
     );
 };
 
