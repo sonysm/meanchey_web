@@ -19,6 +19,14 @@ export const metadata: Metadata = {
   title: "Meanchey Web",
   description: "Meanchey News Platform",
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://meanchey.org"),
+  icons: {
+    icon: [
+      { url: "/icon", type: "image/png" },
+      { url: "/favicon.ico" },
+    ],
+    shortcut: ["/icon", "/favicon.ico"],
+    apple: "/apple-icon",
+  },
 };
 
 export default function RootLayout({
