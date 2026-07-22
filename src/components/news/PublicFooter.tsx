@@ -7,16 +7,16 @@ const socialLinks = [
         href: "https://facebook.com",
         iconClass: "fa-brands fa-facebook-f",
     },
-    {
-        name: "Twitter",
-        href: "https://twitter.com",
-        iconClass: "fa-brands fa-x-twitter",
-    },
-    {
-        name: "Instagram",
-        href: "https://instagram.com",
-        iconClass: "fa-brands fa-instagram",
-    },
+    // {
+    //     name: "Twitter",
+    //     href: "https://twitter.com",
+    //     iconClass: "fa-brands fa-x-twitter",
+    // },
+    // {
+    //     name: "Instagram",
+    //     href: "https://instagram.com",
+    //     iconClass: "fa-brands fa-instagram",
+    // },
 ];
 
 const downloadLinks = [
