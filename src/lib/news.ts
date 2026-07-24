@@ -299,10 +299,8 @@ const mapApiNewsItem = (item: Record<string, unknown>): News => {
     ),
     updatedAt: String(item.updatedAt ?? item.updated_at ?? new Date().toISOString()),
     viewCount:
-      toNumberOrUndefined((item as Record<string, unknown>).total_view) ??
-      toNumberOrUndefined(item.view_count) ??
-      toNumberOrUndefined(item.viewCount) ??
-      toNumberOrUndefined(item.total_read),
+      toNumberOrUndefined((item as Record<string, unknown>).total_read) ??
+      8,
   };
 };
 

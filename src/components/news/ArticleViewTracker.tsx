@@ -6,9 +6,35 @@ type ArticleViewTrackerProps = {
     articleId: string;
 };
 
+const VIEW_DEDUPE_WINDOW_MS = 3000;
+
+const shouldTrackView = (articleId: string): boolean => {
+    if (typeof window === "undefined") {
+        return true;
+    }
+
+    const key = `meanchey:view:${articleId}`;
+    const now = Date.now();
+    const previous = window.sessionStorage.getItem(key);
+
+    if (previous) {
+        const lastTracked = Number(previous);
+        if (Number.isFinite(lastTracked) && now - lastTracked < VIEW_DEDUPE_WINDOW_MS) {
+            return false;
+        }
+    }
+
+    window.sessionStorage.setItem(key, String(now));
+    return true;
+};
+
 export default function ArticleViewTracker({ articleId }: ArticleViewTrackerProps) {
     useEffect(() => {
         if (!articleId) {
+            return;
+        }
+
+        if (!shouldTrackView(articleId)) {
             return;
         }
 
