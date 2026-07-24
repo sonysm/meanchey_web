@@ -677,7 +677,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     if (!response.ok) {
-        console.debug("news.resolveCoverImage: using explicit cover", { response, data });
+        //console.debug("news.resolveCoverImage: using explicit cover", { response, data });
         return NextResponse.json(
             { message: "Failed to update article", data },
             { status: response.status },

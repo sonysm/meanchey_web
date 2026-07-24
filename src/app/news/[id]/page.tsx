@@ -5,6 +5,7 @@ import { ArrowLeft, Eye } from "lucide-react";
 
 import { getNewsById } from "@/lib/news";
 import ArticleBody from "@/components/news/ArticleBody";
+import ArticleViewTracker from "@/components/news/ArticleViewTracker";
 import { Button } from "@/components/ui/button";
 import PublicNavbar from "@/components/news/PublicNavbar";
 
@@ -119,6 +120,7 @@ export default async function PublicNewsDetailPage({
                     __html: JSON.stringify(articleSchema),
                 }}
             />
+            <ArticleViewTracker articleId={article.id} />
             <PublicNavbar />
             <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:py-12">
                 <div className="mb-6 flex items-center justify-between gap-3">

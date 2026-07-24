@@ -449,7 +449,7 @@ export default function QuillEditor({
             throw new Error("Image upload response is invalid");
         }
 
-        console.debug("QuillEditor.uploadImage: upload response imageName", { imageName, imgs });
+        //console.debug("QuillEditor.uploadImage: upload response imageName", { imageName, imgs });
         return imageName;
     }, []);
 

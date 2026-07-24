@@ -49,17 +49,32 @@ const toAbsoluteImageUrl = (image: string, photoBase: string): string => {
     normalized.startsWith("https://") ||
     normalized.startsWith("data:")
   ) {
-    console.debug("news.toAbsoluteImageUrl: already absolute or data url", { image: normalized });
+    //console.debug("news.toAbsoluteImageUrl: already absolute or data url", { image: normalized });
     return normalized;
   }
 
   const resolved = `${photoBase.replace(/\/$/, "")}/${normalized.replace(/^\//, "")}`;
-  console.debug("news.toAbsoluteImageUrl: resolved url", { image: normalized, photoBase, resolved });
+  //console.debug("news.toAbsoluteImageUrl: resolved url", { image: normalized, photoBase, resolved });
   return resolved;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === "object" && value !== null;
+};
+
+const toNumberOrUndefined = (value: unknown): number | undefined => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value.trim());
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return undefined;
 };
 
 const extractFirstImageFromUnknown = (value: unknown): string | null => {
@@ -284,13 +299,10 @@ const mapApiNewsItem = (item: Record<string, unknown>): News => {
     ),
     updatedAt: String(item.updatedAt ?? item.updated_at ?? new Date().toISOString()),
     viewCount:
-      typeof item.viewCount === "number"
-        ? item.viewCount
-        : typeof item.view_count === "number"
-          ? item.view_count
-          : typeof item.total_read === "number"
-            ? item.total_read
-            : undefined,
+      toNumberOrUndefined((item as Record<string, unknown>).total_view) ??
+      toNumberOrUndefined(item.view_count) ??
+      toNumberOrUndefined(item.viewCount) ??
+      toNumberOrUndefined(item.total_read),
   };
 };
 
@@ -367,6 +379,15 @@ export const getNews = async (limit = 20, offset = 0): Promise<News[]> => {
     const payload = await postApi("/article/list", { limit, offset });
     if (!payload) {
       return [];
+    }
+
+    if (process.env.NODE_ENV !== "production") {
+      const root = isRecord(payload) ? payload : null;
+      const data = root && isRecord(root.data) ? root.data : null;
+      const list = data && Array.isArray(data.list) ? data.list : [];
+
+      //console.debug("news-list full payload:\n", JSON.stringify(payload, null, 2));
+      //console.debug("news-list array:\n", JSON.stringify(list, null, 2));
     }
 
     return extractNewsArray(payload).map(mapApiNewsItem);
