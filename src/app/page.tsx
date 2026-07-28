@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { Flame } from "lucide-react";
 
 import { getNews } from "@/lib/news";
+import { AUTH_COOKIE_NAME, parseAuthSession } from "@/lib/auth";
 import PublicNewsFeed from "@/components/news/PublicNewsFeed";
 import PublicNavbar from "@/components/news/PublicNavbar";
 import PublicNewsSearch from "@/components/news/PublicNewsSearch";
@@ -29,6 +31,10 @@ const getCategoryChips = (tags: string[][]): string[] => {
 };
 
 export default async function Home() {
+  const cookieStore = await cookies();
+  const session = parseAuthSession(cookieStore.get(AUTH_COOKIE_NAME)?.value);
+  const canManageInAdmin = session?.loginToken && (session.isEmployer || session.userTypeId === 1);
+
   const articles = await getNews(30, 0);
 
   const featured = articles[0];
@@ -89,9 +95,13 @@ export default async function Home() {
               <p className="mb-3 text-sm font-medium">Categories</p>
               <div className="flex flex-wrap gap-2">
                 {categories.length > 0 ? categories.map((chip) => (
-                  <span key={chip} className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
+                  <Link
+                    key={chip}
+                    href={`/search?q=${encodeURIComponent(chip)}`}
+                    className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-primary hover:bg-primary/5 hover:text-primary"
+                  >
                     {chip}
-                  </span>
+                  </Link>
                 )) : (
                   <span className="text-xs text-muted-foreground">No categories yet</span>
                 )}
@@ -135,9 +145,11 @@ export default async function Home() {
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Latest News</h2>
-            <Link href="/admin/news" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
-              Manage in admin
-            </Link>
+            {canManageInAdmin ? (
+              <Link href="/admin/news" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
+                Manage in admin
+              </Link>
+            ) : null}
           </div>
           <PublicNewsFeed
             initialItems={latest}

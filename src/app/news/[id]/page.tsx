@@ -146,7 +146,13 @@ export default async function PublicNewsDetailPage({
                                 <Eye size={14} /> {article.viewCount?.toLocaleString() ?? 0}
                             </span>
                             {article.tags?.slice(0, 6).map((tag) => (
-                                <span key={tag} className="rounded-full border border-border px-2 py-1">#{tag}</span>
+                                <Link
+                                    key={tag}
+                                    href={`/search?q=${encodeURIComponent(tag)}`}
+                                    className="rounded-full border border-border px-2 py-1 transition-colors hover:border-primary hover:bg-primary/5 hover:text-primary"
+                                >
+                                    #{tag}
+                                </Link>
                             ))}
                         </div>
                     </header>

@@ -4,7 +4,7 @@ import Link from "next/link";
 const socialLinks = [
     {
         name: "Facebook",
-        href: "https://facebook.com",
+        href: "https://www.facebook.com/profile.php?id=61592742052493",
         iconClass: "fa-brands fa-facebook-f",
     },
     // {
@@ -22,7 +22,7 @@ const socialLinks = [
 const downloadLinks = [
     {
         name: "App Store",
-        href: "https://www.apple.com/app-store/",
+        href: "https://apps.apple.com/kh/app/meanchey/id6753885556",
         iconClass: "fa-brands fa-app-store-ios",
     },
     {

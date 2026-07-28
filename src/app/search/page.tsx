@@ -55,9 +55,16 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                 {query ? (
                     <section className="space-y-4">
                         <div className="flex items-center justify-between">
-                            <h1 className="text-xl font-semibold tracking-tight">
-                                Results for "{query}"
-                            </h1>
+                            <div className="space-y-2">
+                                <h1 className="text-xl font-semibold tracking-tight">
+                                    Results for "{query}"
+                                </h1>
+                                <div>
+                                    <span className="inline-flex rounded-full border border-border bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground">
+                                        Tag search: #{query}
+                                    </span>
+                                </div>
+                            </div>
                             <p className="text-sm text-muted-foreground">
                                 {initialResults.data.length} in first batch
                             </p>
