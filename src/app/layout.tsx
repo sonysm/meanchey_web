@@ -16,7 +16,7 @@ const notoSansKhmer = Noto_Sans_Khmer({
 });
 
 export const metadata: Metadata = {
-  title: "Meanchey Web",
+  title: "Meanchey",
   description: "Meanchey News Platform",
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://meanchey.org"),
   icons: {
