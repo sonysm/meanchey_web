@@ -71,7 +71,7 @@ export default function PublicNewsSearch() {
 
     return (
         <div className="rounded-2xl border border-border bg-card p-4">
-            <p className="mb-3 text-sm font-medium">Find news</p>
+            <p className="mb-3 text-sm font-medium">ស្វែងរក</p>
             <form className="space-y-3" onSubmit={handleSearch}>
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

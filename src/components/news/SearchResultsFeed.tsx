@@ -114,7 +114,7 @@ export default function SearchResultsFeed({
                                 </span>
                             </div>
                             <Link href={`/news/${item.id}`}>
-                                <Button variant="outline" size="sm" className="mt-1 w-full">Read more</Button>
+                                <Button variant="outline" size="sm" className="mt-1 w-full">អានបន្តរ</Button>
                             </Link>
                         </div>
                     </article>

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { Flame } from "lucide-react";
+import { Flame, Sparkles } from "lucide-react";
 
-import { getNews } from "@/lib/news";
+import { getNews, getFeaturedNews } from "@/lib/news";
 import { AUTH_COOKIE_NAME, parseAuthSession } from "@/lib/auth";
 import PublicNewsFeed from "@/components/news/PublicNewsFeed";
 import PublicNavbar from "@/components/news/PublicNavbar";
@@ -35,7 +35,10 @@ export default async function Home() {
   const session = parseAuthSession(cookieStore.get(AUTH_COOKIE_NAME)?.value);
   const canManageInAdmin = session?.loginToken && (session.isEmployer || session.userTypeId === 1);
 
-  const articles = await getNews(30, 0);
+  const [articles, featuredNewsItems] = await Promise.all([
+    getNews(30, 0),
+    getFeaturedNews(8),
+  ]);
 
   const featured = articles[0];
   const trending = articles.slice(1, 4);
@@ -109,7 +112,7 @@ export default async function Home() {
             </div>
 
             <div className="rounded-2xl border border-border bg-card p-4">
-              <p className="mb-3 flex items-center gap-2 text-sm font-medium"><Flame className="h-4 w-4" /> Trending</p>
+              <p className="mb-3 flex items-center gap-2 text-sm font-medium"><Flame className="h-4 w-4" /> ពេញនិយម</p>
               <div className="space-y-3">
                 {trending.length > 0 ? trending.map((item) => (
                   <Link
@@ -142,9 +145,54 @@ export default async function Home() {
           </aside>
         </section>
 
+        {featuredNewsItems.length > 0 && (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <h2 className="text-lg font-semibold">អត្ថបទជ្រើសរើស</h2>
+              </div>
+              <Link
+                href="/featured"
+                className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+              >
+                មើលបន្ថែម
+              </Link>
+            </div>
+            <div className="rounded-2xl border border-border bg-card p-4">
+              <div className="space-y-3">
+                {featuredNewsItems.slice(0, 5).map((item) => (
+                  <Link
+                    key={item.id}
+                    href={`/news/${item.id}`}
+                    className="group block rounded-lg p-2 transition-transform duration-200 hover:-translate-y-0.5 hover:bg-muted/50"
+                  >
+                    <div className="flex items-start gap-3">
+                      {item.coverImage ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.coverImage}
+                          alt={item.title}
+                          className="h-12 w-16 shrink-0 rounded-md border border-border object-cover"
+                        />
+                      ) : (
+                        <div className="h-12 w-16 shrink-0 rounded-md border border-dashed border-border bg-muted" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="line-clamp-2 text-sm font-medium transition-colors group-hover:text-primary">{item.title}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
         <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Latest News</h2>
+            <h2 className="text-lg font-semibold">ថ្មីចុងក្រោយ</h2>
             {canManageInAdmin ? (
               <Link href="/admin/news" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
                 Manage in admin

@@ -403,6 +403,23 @@ export const getRecentNews = async (limit = 5): Promise<News[]> => {
   }
 };
 
+export const getFeaturedNews = async (limit = 10, offset = 0): Promise<News[]> => {
+  if (!API_BASE_URL) {
+    return [];
+  }
+
+  try {
+    const payload = await postApi("/article/feature/list", { limit, offset });
+    if (!payload) {
+      return [];
+    }
+
+    return extractNewsArray(payload).map(mapApiNewsItem);
+  } catch {
+    return [];
+  }
+};
+
 export const getNewsById = async (id: string): Promise<News | null> => {
   if (!API_BASE_URL) {
     return null;
