@@ -26,6 +26,7 @@ export interface News {
   createdAt: string;
   updatedAt: string;
   viewCount?: number;
+  featured?: number; // 0 or 1
 }
 
 export interface NewsPagination {

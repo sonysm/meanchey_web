@@ -301,6 +301,7 @@ const mapApiNewsItem = (item: Record<string, unknown>): News => {
     viewCount:
       toNumberOrUndefined((item as Record<string, unknown>).total_read) ??
       8,
+    featured: toNumberOrUndefined(item.feature ?? item.featured) === 1 ? 1 : 0,
   };
 };
 
