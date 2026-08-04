@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Pencil, Eye } from "lucide-react";
 import DeleteArticleButton from "@/components/admin/DeleteArticleButton";
 import FeatureArticleButton from "@/components/admin/FeatureArticleButton";
+import NotifyArticleButton from "@/components/admin/NotifyArticleButton";
 
 export default async function NewsListPage() {
   const cookieStore = await cookies();
@@ -84,6 +85,7 @@ export default async function NewsListPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <NotifyArticleButton articleId={news.id} articleTitle={news.title} coverImage={news.coverImage} />
                       <FeatureArticleButton articleId={news.id} featured={news.featured ?? 0} />
                       <Link href={`/admin/news/${news.id}`}>
                         <Button variant="ghost" size="icon">
