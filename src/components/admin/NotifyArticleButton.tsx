@@ -5,7 +5,6 @@ import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
-    DialogClose,
     DialogContent,
     DialogDescription,
     DialogFooter,
@@ -74,9 +73,7 @@ export default function NotifyArticleButton({ articleId, articleTitle, coverImag
                         {articleTitle}
                     </p>
                     <DialogFooter className="mt-2">
-                        <DialogClose asChild>
-                            <Button variant="outline" disabled={isLoading}>Cancel</Button>
-                        </DialogClose>
+                        <Button variant="outline" disabled={isLoading} onClick={() => setOpen(false)}>Cancel</Button>
                         <Button onClick={() => { void handleSend(); }} disabled={isLoading}>
                             {isLoading ? "Sending…" : "Send Notification"}
                         </Button>
