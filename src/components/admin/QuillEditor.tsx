@@ -587,6 +587,7 @@ export default function QuillEditor({
         }
 
         const hostWrapper = wrapperRef.current;
+
         const editorHost = document.createElement("div");
         hostWrapper.appendChild(editorHost);
 
@@ -615,6 +616,13 @@ export default function QuillEditor({
                     },
                 },
             }) as unknown as QuillLike;
+
+            // Move the toolbar Quill created to the bottom of the wrapper.
+            // Quill prepends .ql-toolbar before .ql-container; we relocate it after.
+            const toolbar = hostWrapper.querySelector(".ql-toolbar");
+            if (toolbar) {
+                hostWrapper.appendChild(toolbar);
+            }
 
             const parsed = parseDelta(initialValueRef.current, initialImageBaseUrlRef.current);
             if (parsed) {
@@ -673,7 +681,7 @@ export default function QuillEditor({
 
     return (
         <div className="space-y-2">
-            <div className="min-h-56 rounded-md border" ref={wrapperRef} />
+            <div className="min-h-56 rounded-md border flex flex-col" ref={wrapperRef} />
 
             {failedImageUrls.length > 0 && (
                 <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2">
