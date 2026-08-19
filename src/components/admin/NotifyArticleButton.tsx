@@ -21,6 +21,8 @@ type NotifyArticleButtonProps = {
 export default function NotifyArticleButton({ articleId, articleTitle, coverImage }: NotifyArticleButtonProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [open, setOpen] = useState(false);
+    const normalizedCoverImage = typeof coverImage === "string" ? coverImage.trim() : "";
+    const hasCoverImage = normalizedCoverImage.length > 0;
 
     const handleSend = async () => {
         if (isLoading) return;
@@ -30,7 +32,7 @@ export default function NotifyArticleButton({ articleId, articleTitle, coverImag
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
-                body: JSON.stringify({ title: articleTitle, imageUrl: coverImage ?? "" }),
+                body: JSON.stringify({ title: articleTitle, imageUrl: normalizedCoverImage }),
             });
 
             const payload = (await response.json().catch(() => ({}))) as { message?: string };
@@ -72,6 +74,21 @@ export default function NotifyArticleButton({ articleId, articleTitle, coverImag
                         <span className="font-medium text-foreground">Article: </span>
                         {articleTitle}
                     </p>
+                    {hasCoverImage ? (
+                        <div className="space-y-2 mt-2">
+                            <p className="text-xs text-muted-foreground">Thumbnail to send:</p>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={normalizedCoverImage}
+                                alt={articleTitle}
+                                className="h-24 w-full max-w-xs rounded object-cover border border-border"
+                            />
+                        </div>
+                    ) : (
+                        <p className="text-xs text-amber-600 mt-2">
+                            No cover image found for this article. Notification may show title/body only.
+                        </p>
+                    )}
                     <DialogFooter className="mt-2">
                         <Button variant="outline" disabled={isLoading} onClick={() => setOpen(false)}>Cancel</Button>
                         <Button onClick={() => { void handleSend(); }} disabled={isLoading}>

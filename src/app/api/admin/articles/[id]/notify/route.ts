@@ -7,6 +7,10 @@ type RouteContext = {
     params: Promise<{ id: string }>;
 };
 
+const isHttpImageUrl = (value: string): boolean => {
+    return value.startsWith("http://") || value.startsWith("https://");
+};
+
 // POST /api/admin/articles/[id]/notify
 // Body: { title: string; imageUrl?: string }
 export async function POST(request: NextRequest, context: RouteContext) {
@@ -26,9 +30,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const b = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
     const title = typeof b.title === "string" ? b.title : "";
-    const imageUrl = typeof b.imageUrl === "string" && b.imageUrl.trim().length > 0 ? b.imageUrl.trim() : undefined;
+    const rawImageUrl = typeof b.imageUrl === "string" && b.imageUrl.trim().length > 0 ? b.imageUrl.trim() : undefined;
+    // FCM rich images must be publicly reachable over HTTP(S).
+    const imageUrl = rawImageUrl && isHttpImageUrl(rawImageUrl) ? rawImageUrl : undefined;
 
-    console.debug("POST /api/admin/articles/[id]/notify", { id, title, imageUrl });
+    console.debug("POST /api/admin/articles/[id]/notify", {
+        id,
+        title,
+        imageUrl,
+        hasRawImageUrl: Boolean(rawImageUrl),
+    });
     try {
         const messaging = getFirebaseMessaging();
 
@@ -47,6 +58,15 @@ export async function POST(request: NextRequest, context: RouteContext) {
             },
             apns: {
                 ...(FCM_APNS_BUNDLE_ID ? { headers: { "apns-topic": FCM_APNS_BUNDLE_ID } } : {}),
+                ...(imageUrl
+                    ? {
+                        payload: {
+                            aps: {
+                                "mutable-content": 1,
+                            },
+                        },
+                    }
+                    : {}),
                 ...(imageUrl ? { fcmOptions: { imageUrl } } : {}),
             },
             data: {
@@ -55,6 +75,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
                 title: "Article",
                 detail: title,
                 ...(imageUrl ? { image: imageUrl } : {}),
+                ...(imageUrl ? { imageUrl } : {}),
+                ...(imageUrl ? { thumbnail: imageUrl } : {}),
             },
         };
 
