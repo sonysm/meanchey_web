@@ -20,9 +20,25 @@ const notoSansKhmer = Noto_Sans_Khmer({
 });
 
 export const metadata: Metadata = {
-  title: "Meanchey",
-  description: "Meanchey News Platform",
+  title: {
+    default: "Meanchey News",
+    template: "%s | Meanchey News",
+  },
+  description: "ព័ត៌មានថ្មីៗ និងព្រឹត្តការណ៍ទាន់ហេតុការណ៍ពីខេត្តមានជ័យ និងទូទាំងប្រទេសកម្ពុជា — Meanchey News Platform.",
+  keywords: ["Meanchey", "មានជ័យ", "Cambodia news", "ព័ត៌មាន", "Khmer news"],
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://meanchey.org"),
+  openGraph: {
+    type: "website",
+    siteName: "Meanchey News",
+    locale: "km_KH",
+  },
+  twitter: {
+    card: "summary_large_image",
+    site: "@meanchey",
+  },
+  verification: {
+    google: "WDlTJjw-Y_RGHagU4AUrC06nnS7Ds6fQb3nFiq8sW24", // ← replace with your code from Google Search Console
+  },
   icons: {
     icon: [
       { url: "/icon", type: "image/png" },
