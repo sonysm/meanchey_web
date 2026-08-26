@@ -4,9 +4,8 @@ import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import PublicFooter from "@/components/news/PublicFooter";
 
-import GoogleAnalytics from "@/app/analytic";
-import FirebaseAnalytics from "@/components/FirebaseAnalytics";
 import { Suspense } from "react";
+import { GoogleAnalytics } from "@next/third-parties/google";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -58,16 +57,13 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${notoSansKhmer.variable} h-full antialiased`}>
       <body>
-        <FirebaseAnalytics />
-        <Suspense>
-          <GoogleAnalytics GA_MEASUREMENT_ID={GA_MEASUREMENT_ID} />
-        </Suspense>
         <TooltipProvider>
           <div className="flex min-h-dvh flex-col">
             <main className="flex-1">{children}</main>
             <PublicFooter />
           </div>
         </TooltipProvider>
+        {GA_MEASUREMENT_ID && <GoogleAnalytics gaId={GA_MEASUREMENT_ID} />}
       </body>
     </html>
   );
