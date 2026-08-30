@@ -102,11 +102,11 @@ const extractCompanyArray = (payload: unknown): Record<string, unknown>[] => {
       : undefined;
 
   const candidates = [
-    root.data,
     dataRoot?.list,
     dataRoot?.items,
     dataRoot?.companies,
     dataRoot?.results,
+    root.data,
     root.items,
     root.companies,
     root.results,
@@ -123,6 +123,18 @@ const extractCompanyArray = (payload: unknown): Record<string, unknown>[] => {
   }
 
   return [];
+};
+
+/**
+ * Extract totalResults from the API response.
+ * The API returns: { data: { totalResults: N, list: [...] } }
+ */
+const extractTotal = (payload: unknown): number => {
+  if (!isRecord(payload)) return 0;
+  const data = isRecord(payload.data) ? payload.data : payload;
+  const raw = data.totalResults ?? data.total_results ?? data.totalRecord ?? data.total;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 0;
 };
 
 /** Sort companies newest-first by createdAt. */
@@ -143,8 +155,15 @@ export type CompanyPage = {
 };
 
 /**
- * Fetch paginated companies list, sorted newest-first.
- * Fetches (pageSize + 1) items to cheaply detect the next page.
+ * Fetch paginated companies list using /com/jlist.
+ *
+ * WHY /com/jlist instead of /com/list:
+ *   - /com/list filters out companies with no active job posts (SQL WHERE count > 0)
+ *     so many companies are silently excluded.
+ *   - /com/jlist returns ALL companies regardless of job posts and
+ *     also returns the correct totalResults count.
+ *
+ * The API natively supports limit + offset so we delegate pagination to it.
  */
 export const getCompanies = async (
   page = 1,
@@ -158,35 +177,29 @@ export const getCompanies = async (
   }
 
   try {
-    // Fetch one extra to know if there's a next page
     const payload = await postApi(
-      "/com/list",
-      { limit: pageSize + 1, offset },
+      "/com/jlist",
+      { limit: pageSize, offset },
       "companies:list",
     );
     if (!payload) {
       return emptyPage(safePage, pageSize);
     }
 
-    const allItems = sortByNewest(
-      extractCompanyArray(payload).map(mapApiCompany),
-    );
-    const hasNext = allItems.length > pageSize;
-    const data = hasNext ? allItems.slice(0, pageSize) : allItems;
-
-    // We don't have a real total from the API; estimate from what we know.
-    // If there's a next page, total is at least (offset + pageSize + 1).
-    const knownMin = offset + data.length + (hasNext ? 1 : 0);
-    const totalPages = hasNext ? safePage + 1 : safePage;
+    const data = sortByNewest(extractCompanyArray(payload).map(mapApiCompany));
+    const total = extractTotal(payload);
+    const totalPages = total > 0 ? Math.ceil(total / pageSize) : safePage + (data.length === pageSize ? 1 : 0);
+    const hasNext = total > 0 ? safePage < totalPages : data.length === pageSize;
+    const hasPrev = safePage > 1;
 
     return {
       data,
-      total: knownMin,
+      total,
       page: safePage,
       pageSize,
       totalPages,
       hasNext,
-      hasPrev: safePage > 1,
+      hasPrev,
     };
   } catch {
     return emptyPage(safePage, pageSize);
@@ -194,7 +207,10 @@ export const getCompanies = async (
 };
 
 /**
- * Search companies by text, paginated, sorted newest-first.
+ * Search companies by text via /com/search, paginated, sorted newest-first.
+ *
+ * The search endpoint supports limit + offset natively and returns totalResults.
+ * Note: /com/search uses a different DB connection and filters by country_code.
  */
 export const searchCompanies = async (
   text: string,
@@ -214,32 +230,29 @@ export const searchCompanies = async (
   const offset = (safePage - 1) * pageSize;
 
   try {
-    // Search doesn't support offset in all backends; fetch extra and slice.
     const payload = await postApi(
       "/com/search",
-      { text: trimmed, limit: pageSize * safePage + 1 },
+      { text: trimmed, limit: pageSize, offset },
       "companies:search",
     );
     if (!payload) {
       return emptyPage(safePage, pageSize);
     }
 
-    const allItems = sortByNewest(
-      extractCompanyArray(payload).map(mapApiCompany),
-    );
-    const pageItems = allItems.slice(offset, offset + pageSize);
-    const hasNext = allItems.length > offset + pageSize;
-    const knownMin = allItems.length;
-    const totalPages = Math.max(safePage, Math.ceil(allItems.length / pageSize));
+    const data = sortByNewest(extractCompanyArray(payload).map(mapApiCompany));
+    const total = extractTotal(payload);
+    const totalPages = total > 0 ? Math.ceil(total / pageSize) : safePage + (data.length === pageSize ? 1 : 0);
+    const hasNext = total > 0 ? safePage < totalPages : data.length === pageSize;
+    const hasPrev = safePage > 1;
 
     return {
-      data: pageItems,
-      total: knownMin,
+      data,
+      total,
       page: safePage,
       pageSize,
       totalPages,
       hasNext,
-      hasPrev: safePage > 1,
+      hasPrev,
     };
   } catch {
     return emptyPage(safePage, pageSize);
