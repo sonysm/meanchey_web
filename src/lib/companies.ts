@@ -5,6 +5,8 @@ const API_DEFAULT_HEADERS: HeadersInit = {
   "Content-Type": "application/json",
 };
 
+export const COMPANIES_PAGE_SIZE = 15;
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
@@ -130,52 +132,126 @@ const sortByNewest = (companies: Company[]): Company[] =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 
-/** Fetch all companies, sorted newest-first. */
+export type CompanyPage = {
+  data: Company[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+};
+
+/**
+ * Fetch paginated companies list, sorted newest-first.
+ * Fetches (pageSize + 1) items to cheaply detect the next page.
+ */
 export const getCompanies = async (
-  limit = 100,
-  offset = 0,
-): Promise<Company[]> => {
+  page = 1,
+  pageSize = COMPANIES_PAGE_SIZE,
+): Promise<CompanyPage> => {
+  const safePage = Math.max(1, page);
+  const offset = (safePage - 1) * pageSize;
+
   if (!API_BASE_URL) {
-    return [];
+    return emptyPage(safePage, pageSize);
   }
 
   try {
+    // Fetch one extra to know if there's a next page
     const payload = await postApi(
       "/com/list",
-      { limit, offset },
+      { limit: pageSize + 1, offset },
       "companies:list",
     );
     if (!payload) {
-      return [];
+      return emptyPage(safePage, pageSize);
     }
-    return sortByNewest(extractCompanyArray(payload).map(mapApiCompany));
+
+    const allItems = sortByNewest(
+      extractCompanyArray(payload).map(mapApiCompany),
+    );
+    const hasNext = allItems.length > pageSize;
+    const data = hasNext ? allItems.slice(0, pageSize) : allItems;
+
+    // We don't have a real total from the API; estimate from what we know.
+    // If there's a next page, total is at least (offset + pageSize + 1).
+    const knownMin = offset + data.length + (hasNext ? 1 : 0);
+    const totalPages = hasNext ? safePage + 1 : safePage;
+
+    return {
+      data,
+      total: knownMin,
+      page: safePage,
+      pageSize,
+      totalPages,
+      hasNext,
+      hasPrev: safePage > 1,
+    };
   } catch {
-    return [];
+    return emptyPage(safePage, pageSize);
   }
 };
 
-/** Search companies by text via /com/search, sorted newest-first. */
-export const searchCompanies = async (text: string): Promise<Company[]> => {
-  if (!API_BASE_URL) {
-    return [];
-  }
-
+/**
+ * Search companies by text, paginated, sorted newest-first.
+ */
+export const searchCompanies = async (
+  text: string,
+  page = 1,
+  pageSize = COMPANIES_PAGE_SIZE,
+): Promise<CompanyPage> => {
   const trimmed = text.trim();
   if (!trimmed) {
-    return getCompanies();
+    return getCompanies(page, pageSize);
   }
 
+  if (!API_BASE_URL) {
+    return emptyPage(page, pageSize);
+  }
+
+  const safePage = Math.max(1, page);
+  const offset = (safePage - 1) * pageSize;
+
   try {
+    // Search doesn't support offset in all backends; fetch extra and slice.
     const payload = await postApi(
       "/com/search",
-      { text: trimmed },
+      { text: trimmed, limit: pageSize * safePage + 1 },
       "companies:search",
     );
     if (!payload) {
-      return [];
+      return emptyPage(safePage, pageSize);
     }
-    return sortByNewest(extractCompanyArray(payload).map(mapApiCompany));
+
+    const allItems = sortByNewest(
+      extractCompanyArray(payload).map(mapApiCompany),
+    );
+    const pageItems = allItems.slice(offset, offset + pageSize);
+    const hasNext = allItems.length > offset + pageSize;
+    const knownMin = allItems.length;
+    const totalPages = Math.max(safePage, Math.ceil(allItems.length / pageSize));
+
+    return {
+      data: pageItems,
+      total: knownMin,
+      page: safePage,
+      pageSize,
+      totalPages,
+      hasNext,
+      hasPrev: safePage > 1,
+    };
   } catch {
-    return [];
+    return emptyPage(safePage, pageSize);
   }
 };
+
+const emptyPage = (page: number, pageSize: number): CompanyPage => ({
+  data: [],
+  total: 0,
+  page,
+  pageSize,
+  totalPages: 1,
+  hasNext: false,
+  hasPrev: false,
+});

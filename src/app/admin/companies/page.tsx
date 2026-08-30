@@ -1,5 +1,9 @@
-import { getCompanies, searchCompanies } from "@/lib/companies";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  getCompanies,
+  searchCompanies,
+  COMPANIES_PAGE_SIZE,
+} from "@/lib/companies";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -10,43 +14,51 @@ import {
 } from "@/components/ui/table";
 import { Building2 } from "lucide-react";
 import { CompaniesSearch } from "@/components/admin/CompaniesSearch";
+import { CompaniesPagination } from "@/components/admin/CompaniesPagination";
 import { Suspense } from "react";
 
 interface PageProps {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; page?: string }>;
 }
 
 export default async function CompaniesPage({ searchParams }: PageProps) {
-  const { q } = await searchParams;
+  const { q, page: pageParam } = await searchParams;
   const query = q?.trim() ?? "";
+  const page = Math.max(1, Number(pageParam) || 1);
 
-  const companies = query
-    ? await searchCompanies(query)
-    : await getCompanies();
+  const result = query
+    ? await searchCompanies(query, page, COMPANIES_PAGE_SIZE)
+    : await getCompanies(page, COMPANIES_PAGE_SIZE);
+
+  const { data: companies, total, hasNext, hasPrev, totalPages } = result;
+
+  // Row range for "Showing X–Y of Z" label
+  const offset = (page - 1) * COMPANIES_PAGE_SIZE;
+  const rowFrom = companies.length === 0 ? 0 : offset + 1;
+  const rowTo = offset + companies.length;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Companies</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            All registered companies, sorted by latest
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold">Companies</h1>
+        <p className="text-muted-foreground text-sm mt-1">
+          All registered companies, sorted by latest
+        </p>
       </div>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
           <CardTitle className="text-base">
             {query
-              ? `Search results for "${query}" (${companies.length})`
-              : `All Companies (${companies.length})`}
+              ? `Results for "${query}"`
+              : "All Companies"}
           </CardTitle>
-          {/* Suspense required because CompaniesSearch reads useSearchParams */}
+          {/* Suspense required: CompaniesSearch reads useSearchParams */}
           <Suspense>
             <CompaniesSearch defaultValue={query} />
           </Suspense>
         </CardHeader>
+
         <CardContent className="p-0 overflow-x-auto">
           {companies.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
@@ -61,6 +73,7 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
             <Table className="min-w-full">
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-8 text-center text-muted-foreground">#</TableHead>
                   <TableHead className="w-full">Company</TableHead>
                   <TableHead>Contact</TableHead>
                   <TableHead>Website</TableHead>
@@ -68,8 +81,14 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {companies.map((company) => (
+                {companies.map((company, idx) => (
                   <TableRow key={company.id}>
+                    {/* Row number */}
+                    <TableCell className="text-center text-xs text-muted-foreground tabular-nums">
+                      {offset + idx + 1}
+                    </TableCell>
+
+                    {/* Company info */}
                     <TableCell>
                       <div className="flex items-center gap-3">
                         {company.logo ? (
@@ -81,10 +100,7 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
                           />
                         ) : (
                           <div className="h-10 w-10 rounded-full border border-dashed border-border bg-muted shrink-0 flex items-center justify-center">
-                            <Building2
-                              size={16}
-                              className="text-muted-foreground"
-                            />
+                            <Building2 size={16} className="text-muted-foreground" />
                           </div>
                         )}
                         <div className="min-w-0">
@@ -104,25 +120,23 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
                         </div>
                       </div>
                     </TableCell>
+
+                    {/* Contact */}
                     <TableCell>
                       <div className="space-y-0.5">
                         {company.email && (
-                          <p className="text-xs text-muted-foreground">
-                            {company.email}
-                          </p>
+                          <p className="text-xs text-muted-foreground">{company.email}</p>
                         )}
                         {company.phone && (
-                          <p className="text-xs text-muted-foreground">
-                            {company.phone}
-                          </p>
+                          <p className="text-xs text-muted-foreground">{company.phone}</p>
                         )}
                         {!company.email && !company.phone && (
-                          <span className="text-xs text-muted-foreground">
-                            —
-                          </span>
+                          <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </div>
                     </TableCell>
+
+                    {/* Website */}
                     <TableCell>
                       {company.website ? (
                         <a
@@ -134,11 +148,11 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
                           {company.website}
                         </a>
                       ) : (
-                        <span className="text-xs text-muted-foreground">
-                          —
-                        </span>
+                        <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </TableCell>
+
+                    {/* Created date */}
                     <TableCell>
                       <span className="text-sm text-muted-foreground whitespace-nowrap">
                         {new Date(company.createdAt).toLocaleDateString()}
@@ -150,6 +164,28 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
             </Table>
           )}
         </CardContent>
+
+        {/* Footer: row count info + pagination */}
+        {companies.length > 0 && (
+          <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-t border-border">
+            <p className="text-xs text-muted-foreground">
+              Showing <span className="font-medium text-foreground">{rowFrom}–{rowTo}</span>{" "}
+              of{" "}
+              <span className="font-medium text-foreground">
+                {hasNext ? `${total}+` : total}
+              </span>{" "}
+              companies
+            </p>
+            <Suspense>
+              <CompaniesPagination
+                page={page}
+                totalPages={totalPages}
+                hasNext={hasNext}
+                hasPrev={hasPrev}
+              />
+            </Suspense>
+          </CardFooter>
+        )}
       </Card>
     </div>
   );
