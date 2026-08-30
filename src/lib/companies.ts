@@ -40,6 +40,7 @@ const mapApiCompany = (item: Record<string, unknown>): Company => {
 
   return {
     id,
+    userId: item.user_id ? String(item.user_id) : undefined,
     name,
     nameKh:
       typeof item.nameKh === "string"
@@ -268,3 +269,24 @@ const emptyPage = (page: number, pageSize: number): CompanyPage => ({
   hasNext: false,
   hasPrev: false,
 });
+
+/**
+ * Delete a company (soft-delete).
+ * Requires the user's login token.
+ */
+export const deleteCompany = async (id: string, loginToken: string): Promise<boolean> => {
+  if (!API_BASE_URL) return false;
+
+  try {
+    const payload = await postApi(
+      "/com-del",
+      { id, login_token: loginToken },
+      "companies:delete"
+    );
+    // Based on standard meanchey-api response, error_code 0 is success
+    const result = payload as { error_code?: number };
+    return result?.error_code === 0;
+  } catch {
+    return false;
+  }
+};

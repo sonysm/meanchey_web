@@ -15,7 +15,10 @@ import {
 import { Building2 } from "lucide-react";
 import { CompaniesSearch } from "@/components/admin/CompaniesSearch";
 import { CompaniesPagination } from "@/components/admin/CompaniesPagination";
+import DeleteCompanyButton from "@/components/admin/DeleteCompanyButton";
 import { Suspense } from "react";
+import { cookies } from "next/headers";
+import { AUTH_COOKIE_NAME, parseAuthSession } from "@/lib/auth";
 
 interface PageProps {
   searchParams: Promise<{ q?: string; page?: string }>;
@@ -25,6 +28,11 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
   const { q, page: pageParam } = await searchParams;
   const query = q?.trim() ?? "";
   const page = Math.max(1, Number(pageParam) || 1);
+
+  const cookieStore = await cookies();
+  const sessionValue = cookieStore.get(AUTH_COOKIE_NAME)?.value;
+  const session = sessionValue ? parseAuthSession(sessionValue) : null;
+  const currentUserId = session?.userId ? String(session.userId) : null;
 
   const result = query
     ? await searchCompanies(query, page, COMPANIES_PAGE_SIZE)
@@ -78,6 +86,7 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
                   <TableHead>Contact</TableHead>
                   <TableHead>Website</TableHead>
                   <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -157,6 +166,16 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
                       <span className="text-sm text-muted-foreground whitespace-nowrap">
                         {new Date(company.createdAt).toLocaleDateString()}
                       </span>
+                    </TableCell>
+
+                    {/* Actions */}
+                    <TableCell className="text-right">
+                      {currentUserId && company.userId === currentUserId && (
+                        <DeleteCompanyButton
+                          companyId={company.id}
+                          name={company.name}
+                        />
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
