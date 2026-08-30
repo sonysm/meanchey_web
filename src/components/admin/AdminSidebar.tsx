@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Newspaper,
   PlusCircle,
+  Building2,
   Settings,
   LogOut,
   Menu,
@@ -41,6 +42,11 @@ const navItems = [
     label: "Create News",
     href: "/admin/news/create",
     icon: PlusCircle,
+  },
+  {
+    label: "Companies",
+    href: "/admin/companies",
+    icon: Building2,
   },
 ];
 
