@@ -141,7 +141,7 @@ export const getCompanies = async (
 
   try {
     const payload = await postApi(
-      "/company/list",
+      "/com/list",
       { limit, offset },
       "companies:list",
     );
