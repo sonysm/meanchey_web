@@ -1,34 +1,63 @@
 import { NextRequest, NextResponse } from "next/server";
-import { AUTH_COOKIE_NAME, getAuthSessionFromCookieValue } from "@/lib/auth";
-import { searchCompanies, getCompanies } from "@/lib/companies";
 import { cookies } from "next/headers";
+import { AUTH_COOKIE_NAME, parseAuthSession } from "@/lib/auth";
 
-/**
- * GET /api/admin/companies?q=<search text>
- *
- * Returns companies list. If `q` is provided, proxies to /com/search.
- * Requires a valid admin session.
- */
-export async function GET(request: NextRequest) {
-  // Auth guard
-  const cookieStore = await cookies();
-  const session = getAuthSessionFromCookieValue(
-    cookieStore.get(AUTH_COOKIE_NAME)?.value,
-  );
+const API_BASE_URL = process.env.MEANCHEY_API_BASE_URL;
 
-  if (!session?.loginToken) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function POST(req: NextRequest) {
+  if (!API_BASE_URL) {
+    return NextResponse.json({ message: "API URL not configured" }, { status: 500 });
   }
 
-  const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
+  const cookieStore = await cookies();
+  const sessionValue = cookieStore.get(AUTH_COOKIE_NAME)?.value;
+  const session = sessionValue ? parseAuthSession(sessionValue) : null;
+
+  if (!session || !session.loginToken || session.userTypeId !== 1) {
+    return NextResponse.json({ message: "Unauthorized. Must be admin." }, { status: 401 });
+  }
 
   try {
-    const companies = q ? await searchCompanies(q) : await getCompanies();
-    return NextResponse.json({ companies });
-  } catch {
-    return NextResponse.json(
-      { error: "Failed to fetch companies" },
-      { status: 500 },
-    );
+    const formData = await req.formData();
+    formData.append("login_token", session.loginToken);
+    
+    // Add default country_code if not present
+    if (!formData.has("country_code")) {
+      formData.append("country_code", "kh");
+    }
+
+    const url = new URL("/com-save", API_BASE_URL);
+    const response = await fetch(url.toString(), {
+      method: "POST",
+      body: formData, // passing raw formData handles multipart boundary natively
+    });
+
+    const raw = await response.text();
+    let data: unknown = null;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = raw;
+    }
+
+    if (!response.ok) {
+      return NextResponse.json(
+        { message: "Failed to create company", data },
+        { status: response.status }
+      );
+    }
+
+    // Usually meanchey API returns error_code 0 for success
+    const result = data as { error_code?: number; error_message?: string };
+    if (result.error_code !== 0 && result.error_code !== undefined) {
+      return NextResponse.json(
+        { message: result.error_message || "Failed to create company", data },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({ message: "Company created successfully", data });
+  } catch (error) {
+    return NextResponse.json({ message: "Internal server error" }, { status: 500 });
   }
 }

@@ -290,3 +290,29 @@ export const deleteCompany = async (id: string, loginToken: string): Promise<boo
     return false;
   }
 };
+
+/**
+ * Fetch a single company by ID.
+ * /com/get endpoint natively returns the company detail.
+ */
+export const getCompanyById = async (id: string): Promise<Company | null> => {
+  if (!API_BASE_URL) return null;
+
+  try {
+    const payload = await postApi(
+      "/com/get",
+      { id },
+      `company:${id}`
+    );
+    if (!payload) return null;
+
+    // Based on standard API structure, data might be nested
+    const root = payload as any;
+    const data = root.data || root;
+    if (!data || Object.keys(data).length === 0) return null;
+
+    return mapApiCompany(data);
+  } catch {
+    return null;
+  }
+};

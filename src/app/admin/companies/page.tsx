@@ -12,13 +12,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Building2 } from "lucide-react";
+import { Building2, Plus, Edit } from "lucide-react";
 import { CompaniesSearch } from "@/components/admin/CompaniesSearch";
 import { CompaniesPagination } from "@/components/admin/CompaniesPagination";
 import DeleteCompanyButton from "@/components/admin/DeleteCompanyButton";
 import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { AUTH_COOKIE_NAME, parseAuthSession } from "@/lib/auth";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   searchParams: Promise<{ q?: string; page?: string }>;
@@ -40,18 +42,25 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
 
   const { data: companies, total, hasNext, hasPrev, totalPages } = result;
 
-  // Row range for "Showing X–Y of Z" label
   const offset = (page - 1) * COMPANIES_PAGE_SIZE;
   const rowFrom = companies.length === 0 ? 0 : offset + 1;
   const rowTo = offset + companies.length;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Companies</h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          All registered companies, sorted by latest
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Companies</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            All registered companies, sorted by latest
+          </p>
+        </div>
+        <Link href="/admin/companies/create">
+          <Button>
+            <Plus className="mr-2" size={16} />
+            Create Company
+          </Button>
+        </Link>
       </div>
 
       <Card>
@@ -61,7 +70,6 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
               ? `Results for "${query}"`
               : "All Companies"}
           </CardTitle>
-          {/* Suspense required: CompaniesSearch reads useSearchParams */}
           <Suspense>
             <CompaniesSearch defaultValue={query} />
           </Suspense>
@@ -92,12 +100,10 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
               <TableBody>
                 {companies.map((company, idx) => (
                   <TableRow key={company.id}>
-                    {/* Row number */}
                     <TableCell className="text-center text-xs text-muted-foreground tabular-nums">
                       {offset + idx + 1}
                     </TableCell>
 
-                    {/* Company info */}
                     <TableCell>
                       <div className="flex items-center gap-3">
                         {company.logo ? (
@@ -130,7 +136,6 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
                       </div>
                     </TableCell>
 
-                    {/* Contact */}
                     <TableCell>
                       <div className="space-y-0.5">
                         {company.email && (
@@ -145,7 +150,6 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
                       </div>
                     </TableCell>
 
-                    {/* Website */}
                     <TableCell>
                       {company.website ? (
                         <a
@@ -161,20 +165,25 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
                       )}
                     </TableCell>
 
-                    {/* Created date */}
                     <TableCell>
                       <span className="text-sm text-muted-foreground whitespace-nowrap">
                         {new Date(company.createdAt).toLocaleDateString()}
                       </span>
                     </TableCell>
 
-                    {/* Actions */}
                     <TableCell className="text-right">
                       {currentUserId && company.userId === currentUserId && (
-                        <DeleteCompanyButton
-                          companyId={company.id}
-                          name={company.name}
-                        />
+                        <div className="flex items-center justify-end gap-1">
+                          <Link href={`/admin/companies/edit/${company.id}`}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                              <Edit size={15} />
+                            </Button>
+                          </Link>
+                          <DeleteCompanyButton
+                            companyId={company.id}
+                            name={company.name}
+                          />
+                        </div>
                       )}
                     </TableCell>
                   </TableRow>
@@ -184,7 +193,6 @@ export default async function CompaniesPage({ searchParams }: PageProps) {
           )}
         </CardContent>
 
-        {/* Footer: row count info + pagination */}
         {companies.length > 0 && (
           <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-t border-border">
             <p className="text-xs text-muted-foreground">
