@@ -187,7 +187,7 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
           {/* Logo Upload & Preview */}
           <div className="space-y-4">
             <label className="text-sm font-medium block">Logo Image</label>
-            <div className="flex items-center gap-6">
+            <div className="flex flex-col gap-4">
               <div className="h-24 w-24 shrink-0 rounded-full border border-dashed border-border bg-muted flex items-center justify-center overflow-hidden relative">
                 {logoPreview ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -196,7 +196,7 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                   <Building2 size={24} className="text-muted-foreground" />
                 )}
               </div>
-              <div className="flex-1 space-y-2">
+              <div className="w-full space-y-2">
                 <Input type="file" accept="image/*" {...register("logo")} />
                 <p className="text-xs text-muted-foreground">Recommended: Square image (1:1 ratio)</p>
               </div>
@@ -206,8 +206,8 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
           {/* Cover Upload & Preview */}
           <div className="space-y-4">
             <label className="text-sm font-medium block">Cover Image</label>
-            <div className="flex flex-col sm:flex-row items-start gap-6">
-              <div className="w-full sm:w-48 aspect-video shrink-0 rounded-md border border-dashed border-border bg-muted flex items-center justify-center overflow-hidden relative">
+            <div className="flex flex-col gap-4">
+              <div className="w-full max-w-[240px] aspect-video shrink-0 rounded-md border border-dashed border-border bg-muted flex items-center justify-center overflow-hidden relative">
                 {coverPreview ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={coverPreview} alt="Cover preview" className="object-cover w-full h-full" />
@@ -215,7 +215,7 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
                   <ImageIcon size={24} className="text-muted-foreground" />
                 )}
               </div>
-              <div className="flex-1 space-y-2 w-full">
+              <div className="w-full space-y-2">
                 <Input type="file" accept="image/*" {...register("cover_img")} />
                 <p className="text-xs text-muted-foreground">Recommended: 16:9 ratio</p>
               </div>
