@@ -1,6 +1,7 @@
 export interface Company {
   id: string;
   userId?: string;
+  comCategoryId?: string | number;
   name: string;
   nameKh?: string;
   logo?: string;

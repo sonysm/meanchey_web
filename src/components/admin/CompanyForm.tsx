@@ -12,9 +12,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Company } from "@/types/company";
 import { Building2, Image as ImageIcon } from "lucide-react";
 
+import { getCompanyCategories } from "@/lib/categories";
+
 const companySchema = z.object({
   name: z.string().min(1, "Name is required"),
-  com_category_id: z.string().min(1, "Category ID is required"),
+  com_category_id: z.string().min(1, "Category is required"),
   email: z.string().email("Invalid email").or(z.literal("")).optional(),
   phone: z.string().optional(),
   address: z.string().optional(),
@@ -38,9 +40,25 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<{id: string | number, title: string}[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   
   const [logoPreview, setLogoPreview] = useState<string | null>(initialData?.logo || null);
   const [coverPreview, setCoverPreview] = useState<string | null>(initialData?.coverImage || null);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const data = await getCompanyCategories();
+        setCategories(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Failed to fetch categories", err);
+      } finally {
+        setIsLoadingCategories(false);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   const {
     register,
@@ -51,7 +69,7 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
     resolver: zodResolver(companySchema),
     defaultValues: {
       name: initialData?.name || "",
-      com_category_id: "5", // Default
+      com_category_id: initialData?.comCategoryId ? String(initialData.comCategoryId) : "",
       email: initialData?.email || "",
       phone: initialData?.phone || "",
       address: initialData?.address || "",
@@ -149,8 +167,19 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Category ID *</label>
-            <Input placeholder="5" {...register("com_category_id")} />
+            <label className="text-sm font-medium">Category *</label>
+            <select
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              {...register("com_category_id")}
+              disabled={isLoadingCategories}
+            >
+              <option value="">Select category...</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.title}
+                </option>
+              ))}
+            </select>
             {errors.com_category_id && <p className="text-xs text-destructive">{errors.com_category_id.message as string}</p>}
           </div>
 

@@ -52,6 +52,13 @@ const mapApiCompany = (item: Record<string, unknown>): Company => {
   return {
     id,
     userId: item.user_id ? String(item.user_id) : undefined,
+    comCategoryId: item.company_category_id 
+      ? String(item.company_category_id) 
+      : item.com_category_id 
+        ? String(item.com_category_id) 
+        : item.category_id 
+          ? String(item.category_id) 
+          : undefined,
     name,
     nameKh:
       typeof item.nameKh === "string"
