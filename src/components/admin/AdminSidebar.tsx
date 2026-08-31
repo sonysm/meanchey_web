@@ -12,6 +12,8 @@ import {
   LogOut,
   Menu,
   X,
+  Users as UsersIcon,
+  Image as ImageIcon,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -47,6 +49,16 @@ const navItems = [
     label: "Companies",
     href: "/admin/companies",
     icon: Building2,
+  },
+  {
+    label: "Users",
+    href: "/admin/users",
+    icon: UsersIcon,
+  },
+  {
+    label: "Banners",
+    href: "/admin/banners",
+    icon: ImageIcon,
   },
 ];
 
