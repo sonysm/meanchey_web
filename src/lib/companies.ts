@@ -37,6 +37,17 @@ const postApi = async (
 const mapApiCompany = (item: Record<string, unknown>): Company => {
   const id = String(item.id ?? item._id ?? "");
   const name = String(item.name ?? item.company_name ?? item.title ?? "Unknown");
+  const photoPath = item.photo_path ?? item.photoPath;
+  const resolveImageUrl = (path: unknown): string | undefined => {
+    if (typeof path !== "string" || !path) return undefined;
+    if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) return path;
+    const base = typeof photoPath === "string" && photoPath ? photoPath : "https://meanchey.org/storage/";
+    return base.endsWith("/") && path.startsWith("/")
+      ? base + path.substring(1)
+      : base.endsWith("/") || path.startsWith("/")
+      ? base + path
+      : base + "/" + path;
+  };
 
   return {
     id,
@@ -48,18 +59,8 @@ const mapApiCompany = (item: Record<string, unknown>): Company => {
         : typeof item.name_kh === "string"
           ? item.name_kh
           : undefined,
-    logo:
-      typeof item.logo === "string" && item.logo
-        ? item.logo
-        : typeof item.logo_url === "string" && item.logo_url
-          ? item.logo_url
-          : undefined,
-    coverImage:
-      typeof item.cover_image === "string" && item.cover_image
-        ? item.cover_image
-        : typeof item.cover_img === "string" && item.cover_img
-          ? item.cover_img
-          : undefined,
+    logo: resolveImageUrl(item.logo) ?? resolveImageUrl(item.logo_url),
+    coverImage: resolveImageUrl(item.cover_image) ?? resolveImageUrl(item.cover_img),
     description:
       typeof item.description === "string" ? item.description : undefined,
     website:
