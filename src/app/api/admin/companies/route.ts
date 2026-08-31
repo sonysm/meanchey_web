@@ -13,8 +13,8 @@ export async function POST(req: NextRequest) {
   const sessionValue = cookieStore.get(AUTH_COOKIE_NAME)?.value;
   const session = sessionValue ? parseAuthSession(sessionValue) : null;
 
-  if (!session || !session.loginToken || session.userTypeId !== 1) {
-    return NextResponse.json({ message: "Unauthorized. Must be admin." }, { status: 401 });
+  if (!session || !session.loginToken || (!session.isEmployer && session.userTypeId !== 1)) {
+    return NextResponse.json({ message: "Unauthorized. Must be admin or employer." }, { status: 401 });
   }
 
   try {
