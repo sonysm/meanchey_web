@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Company } from "@/types/company";
+import { Building2, Image as ImageIcon } from "lucide-react";
 
 const companySchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -37,10 +38,14 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const [logoPreview, setLogoPreview] = useState<string | null>(initialData?.logo || null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(initialData?.coverImage || null);
 
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
@@ -58,6 +63,25 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
       pinterest: "",
     },
   });
+
+  const logoFile = watch("logo");
+  const coverFile = watch("cover_img");
+
+  useEffect(() => {
+    if (logoFile && logoFile.length > 0) {
+      const objectUrl = URL.createObjectURL(logoFile[0]);
+      setLogoPreview(objectUrl);
+      return () => URL.revokeObjectURL(objectUrl);
+    }
+  }, [logoFile]);
+
+  useEffect(() => {
+    if (coverFile && coverFile.length > 0) {
+      const objectUrl = URL.createObjectURL(coverFile[0]);
+      setCoverPreview(objectUrl);
+      return () => URL.revokeObjectURL(objectUrl);
+    }
+  }, [coverFile]);
 
   const onSubmit = async (data: CompanyFormValues) => {
     setIsSubmitting(true);
@@ -160,14 +184,42 @@ export function CompanyForm({ initialData }: CompanyFormProps) {
             {errors.detail && <p className="text-xs text-destructive">{errors.detail.message as string}</p>}
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Logo Image</label>
-            <Input type="file" accept="image/*" {...register("logo")} />
+          {/* Logo Upload & Preview */}
+          <div className="space-y-4">
+            <label className="text-sm font-medium block">Logo Image</label>
+            <div className="flex items-center gap-6">
+              <div className="h-24 w-24 shrink-0 rounded-full border border-dashed border-border bg-muted flex items-center justify-center overflow-hidden relative">
+                {logoPreview ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={logoPreview} alt="Logo preview" className="object-cover w-full h-full" />
+                ) : (
+                  <Building2 size={24} className="text-muted-foreground" />
+                )}
+              </div>
+              <div className="flex-1 space-y-2">
+                <Input type="file" accept="image/*" {...register("logo")} />
+                <p className="text-xs text-muted-foreground">Recommended: Square image (1:1 ratio)</p>
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Cover Image</label>
-            <Input type="file" accept="image/*" {...register("cover_img")} />
+          {/* Cover Upload & Preview */}
+          <div className="space-y-4">
+            <label className="text-sm font-medium block">Cover Image</label>
+            <div className="flex flex-col sm:flex-row items-start gap-6">
+              <div className="w-full sm:w-48 aspect-video shrink-0 rounded-md border border-dashed border-border bg-muted flex items-center justify-center overflow-hidden relative">
+                {coverPreview ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={coverPreview} alt="Cover preview" className="object-cover w-full h-full" />
+                ) : (
+                  <ImageIcon size={24} className="text-muted-foreground" />
+                )}
+              </div>
+              <div className="flex-1 space-y-2 w-full">
+                <Input type="file" accept="image/*" {...register("cover_img")} />
+                <p className="text-xs text-muted-foreground">Recommended: 16:9 ratio</p>
+              </div>
+            </div>
           </div>
 
         </CardContent>

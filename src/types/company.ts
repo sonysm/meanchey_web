@@ -4,6 +4,7 @@ export interface Company {
   name: string;
   nameKh?: string;
   logo?: string;
+  coverImage?: string;
   description?: string;
   website?: string;
   phone?: string;

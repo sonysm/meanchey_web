@@ -54,6 +54,12 @@ const mapApiCompany = (item: Record<string, unknown>): Company => {
         : typeof item.logo_url === "string" && item.logo_url
           ? item.logo_url
           : undefined,
+    coverImage:
+      typeof item.cover_image === "string" && item.cover_image
+        ? item.cover_image
+        : typeof item.cover_img === "string" && item.cover_img
+          ? item.cover_img
+          : undefined,
     description:
       typeof item.description === "string" ? item.description : undefined,
     website:
